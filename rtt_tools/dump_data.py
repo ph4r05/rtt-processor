@@ -12,15 +12,17 @@ import itertools
 import collections
 import json
 import argparse
-from typing import Optional, List
+from typing import Optional, List, Dict, Tuple, Union, Any
 
+
+# TODO: BoolTest extraction from RTT DB
 
 logger = logging.getLogger(__name__)
 coloredlogs.CHROOT_FILES = []
 coloredlogs.install(level=logging.DEBUG, use_chroot=False)
 
 
-STATISTICAL_PREFIXES = ['chi', 'kolm', 'ander', 'ad']
+STATISTICAL_PREFIXES = ['chi', 'kolm', 'ander', 'ad', 'pva']
 
 
 def chunks(items, size):
@@ -294,6 +296,10 @@ def get_battery_idx(name):
         return 6
     elif name.startswith('TestU01 Small Crush'):
         return 7
+    elif name.lower().startswith('booltest_1'):
+        return 9
+    elif name.lower().startswith('booltest_2'):
+        return 10
     elif name.lower().startswith('booltest'):
         return 8
     else:
@@ -301,7 +307,7 @@ def get_battery_idx(name):
 
 
 def get_short_bat(idx):
-    x = ['NIST', 'FIPS140-2', 'Dieharder', 'U01 Alphabit', 'U01 Big Crush', 'U01 Balphabit', 'U01 Rabbit', 'U01 SCrush', 'Booltest']
+    x = ['NIST', 'FIPS140-2', 'Dieharder', 'U01 Alphabit', 'U01 Big Crush', 'U01 Balphabit', 'U01 Rabbit', 'U01 SCrush', 'Booltest', 'booltest_1', 'booltest_2']
     return x[idx] if idx >= 0 else '?'
 
 
@@ -558,17 +564,21 @@ class Statistic:
 
 
 class Stest:
-    __slots__ = ('id', 'idx', 'variant_id', 'params', 'pvals', 'npvals', 'stats', 'variant')
+    __slots__ = ('id', 'idx', 'variant_id', 'params', 'pvals', 'npvals', 'stats', 'variant', 'passed', 'aux', )
 
     def __init__(self, idd, idx, variant_id, params=None):
         self.id = idd
         self.idx = idx  # subtest index in the variant
         self.variant_id = variant_id
         self.params = params or Config()  # type: Config
-        self.pvals = []  # type: list[float]
-        self.stats = []  # type: list[Statistic]
-        self.variant = None  # type: TVar
+        self.pvals = []  # type: List[float]
+        self.stats = []  # type: List[Statistic]
+        self.variant = None  # type: Optional[TVar]
         self.npvals = 0
+
+        # computed variable for evaluation purposes
+        self.passed = True
+        self.aux = {}
 
     def set_pvals(self, pvals):
         self.pvals = pvals
@@ -591,15 +601,17 @@ class Stest:
 
 
 class TVar:
-    __slots__ = ('id', 'vidx', 'test_id', 'settings', 'sub_tests', 'test')
+    __slots__ = ('id', 'vidx', 'test_id', 'settings', 'sub_tests', 'test', 'result', 'aux', )
 
-    def __init__(self, id, vidx, test_id, settings=None):
+    def __init__(self, id, vidx, test_id, settings=None, result=None):
         self.id = id
         self.vidx = vidx  # variant_index in the test set
         self.test_id = test_id
         self.settings = settings or Config()  # type: Config
-        self.sub_tests = {}  # type: dict[int, Stest]
-        self.test = None  # type: Test
+        self.sub_tests = {}  # type: Dict[int, Stest]
+        self.test = None  # type: Optional[Test]
+        self.result = result
+        self.aux = {}
 
     def __repr__(self):
         return 'Variant(%s, %s, test=%s)' % (self.vidx, self.settings, self.test)
@@ -613,19 +625,21 @@ class TVar:
 
 class Test:
     __slots__ = ('id', 'name', 'palpha', 'passed', 'test_idx', 'battery_id', 'battery', 'variants',
-                 'summarized_pvals', 'summarized_passed', )
+                 'summarized_pvals', 'summarized_passed', 'pvalue', 'aux', )
 
-    def __init__(self, idd, name, palpha, passed, test_idx, battery_id):
+    def __init__(self, idd, name, palpha, passed, test_idx, battery_id, pvalue=None):
         self.id = idd
         self.name = name
         self.palpha = palpha
         self.passed = passed
         self.test_idx = test_idx
         self.battery_id = battery_id
-        self.battery = None  # type: Battery
-        self.variants = {}  # type: dict[int, TVar]
+        self.battery = None  # type: Optional[Battery]
+        self.variants = {}  # type: Dict[int, TVar]
         self.summarized_pvals = []
         self.summarized_passed = []
+        self.pvalue = pvalue
+        self.aux = {}
 
     def __repr__(self):
         return 'Test(%s, battery=%s)' % (self.name, self.battery)
@@ -647,7 +661,7 @@ class Test:
 
 
 class Battery:
-    def __init__(self, idd, name, passed, total, alpha, exp_id, job_id=None):
+    def __init__(self, idd, name, passed, total, alpha, exp_id, job_id=None, pvalue=None):
         self.id = idd
         self.name = name
         self.passed = passed
@@ -655,8 +669,10 @@ class Battery:
         self.alpha = alpha
         self.exp_id = exp_id
         self.job_id = job_id
-        self.exp = None  # type: Experiment
-        self.tests = {}  # type: dict[int, Test]
+        self.exp = None  # type: Optional[Experiment]
+        self.tests = {}  # type: Dict[int, Test]
+        self.pvalue = pvalue
+        self.aux = {}
 
     def __repr__(self):
         return 'Battery(%s, exp=%s)' % (self.name, self.exp)
@@ -679,6 +695,7 @@ class ExpInfo:
         self.key = None
         self.offset = None
         self.derivation = None
+        self.aux = {}
 
     def __repr__(self):
         return 'Einfo(id=%r, m=%r, s=%r, si=%r, osi=%r, fname=%r, fr=%r, fb=%r, k=%r, off=%r, der=%r)' % (
@@ -692,7 +709,8 @@ class Experiment:
         self.id = eid
         self.name = name
         self.exp_info = exp_info  # type: ExpInfo
-        self.batteries = {}  # type: dict[int, Battery]
+        self.batteries = {}  # type: Dict[int, Battery]
+        self.aux = {}
 
     def __repr__(self):
         return 'Exp(%s)' % self.name
@@ -713,10 +731,10 @@ class Loader:
     def __init__(self):
         self.args = None
         self.conn = None
-        self.experiments = {}  # type: dict[int, Experiment]
-        self.batteries = {}  # type: dict[int, Battery]
-        self.tests = {}  # type: dict[int, Test]
-        self.sids = {}  # type: dict[int, Stest]
+        self.experiments = {}  # type: Dict[int, Experiment]
+        self.batteries = {}  # type: Dict[int, Battery]
+        self.tests = {}  # type: Dict[int, Test]
+        self.sids = {}  # type: Dict[int, Stest]
         self.picked_stats = None
         self.add_passed = False
 
@@ -733,9 +751,9 @@ class Loader:
         self.test_par_indices_db = {}
         self.stats_db = {}
 
-        self.to_proc_test = []  # type: list[Test]
-        self.to_proc_variant = []  # type: list[TVar]
-        self.to_proc_stest = []  # type: list[Stest]
+        self.to_proc_test = []  # type: List[Test]
+        self.to_proc_variant = []  # type: List[TVar]
+        self.to_proc_stest = []  # type: List[Stest]
 
     def load_from(self, loader):
         self.experiments = loader.experiments
@@ -868,7 +886,7 @@ class Loader:
             return False
 
         ids = sorted(list([x.id for x in self.to_proc_test]))
-        idmap = {x.id: x for x in self.to_proc_test}  # type: dict[int, Test]
+        idmap = {x.id: x for x in self.to_proc_test}  # type: Dict[int, Test]
         logger.info("Loading all variants params, len: %s" % len(ids))
 
         with self.conn.cursor() as c:
@@ -917,6 +935,18 @@ class Loader:
                 self.new_usetting_config(cfg)
                 vidmap[k].settings = cfg
 
+            # Variant results
+            c.execute("""
+                        SELECT * FROM variant_results 
+                        WHERE variant_id IN (%s) ORDER BY variant_id
+                      """ % ','.join([str(x) for x in vids]))
+
+            for k, g in itertools.groupby(c.fetchall(), lambda x: x[2]):
+                cres = None
+                for cc in g:
+                    cres = cc
+                vidmap[k].results = cres
+
             # All subtests
             c.execute("""
                         SELECT * FROM subtests 
@@ -945,7 +975,7 @@ class Loader:
             return False
 
         sids = sorted(list([x.id for x in self.to_proc_stest]))
-        sidmap = {x.id: x for x in self.to_proc_stest}  # type: dict[int, Stest]
+        sidmap = {x.id: x for x in self.to_proc_stest}  # type: Dict[int, Stest]
         logger.info("Loading all subtest params, len: %s" % len(sids))
 
         with self.conn.cursor() as c:
@@ -1084,7 +1114,7 @@ class Loader:
             self.process_variant(True)
             self.process_stest(True)
 
-    def load_booltest(self, js=None, fname=None, alpha=1/20000., as_subtests=True):
+    def load_booltest(self, js=None, fname=None, alpha=1/20000., as_subtests=True, battery='booltest', res_filter=None):
         if fname:
             with open(fname, 'r') as fh:
                 js = json.load(fh)
@@ -1093,17 +1123,26 @@ class Loader:
             raise ValueError("Empty data")
 
         # Experiment mapping name -> exp record
+        js = [x for x in js if x]  # simple drop of None results
+        seed_present = 'seed' in js[0]
+        # Experiment name = mostly data file
         exp_name_map = {e.name: e for e in self.experiments.values()}
-        sorter = lambda x: (x["data_file"], x["m"], x["deg"], x["k"])
+        
+        if seed_present:
+            sorter = lambda x: (x["data_file"], x['seed'], x["m"], x["deg"], x["k"])
+            grouper = lambda x: (x["data_file"])
+        else:
+            sorter = lambda x: (x["data_file"], x["m"], x["deg"], x["k"])
+            grouper = lambda x: (x["data_file"])
         js = sorted(js, key=sorter)
 
         # Experiments matching
-        for k, g in itertools.groupby(js, key=lambda x: x["data_file"]):
+        for k, g in itertools.groupby(js, key=grouper):
             name = k
             subs = list(g)
 
             if name not in exp_name_map:
-                logger.warning("Could not find experiment %s")
+                logger.warning("Could not find experiment %s" % (name, ))
                 continue
 
             exp = exp_name_map[name]  # type: Experiment
@@ -1111,8 +1150,8 @@ class Loader:
             self.last_bool_battery_id += 1
 
             # Create battery
-            self.new_battery('booltest')
-            bt = Battery(idd=bid, name='booltest', passed=0, total=0, alpha=alpha, exp_id=exp.id)
+            self.new_battery(battery)
+            bt = Battery(idd=bid, name=battery, passed=0, total=0, alpha=alpha, exp_id=exp.id)
             bt.exp = self.experiments[bt.exp_id]
 
             self.batteries[bt.id] = bt
@@ -1167,7 +1206,7 @@ class Loader:
 
     def load_booltest_as_subtests(self, bt: Battery, alpha: float, exp: str, subs: list):
         # Create test
-        tt = Test(idd=self.last_bool_test_id, name='', palpha=alpha, passed=False,
+        tt = Test(idd=self.last_bool_test_id, name='BoolTest', palpha=alpha, passed=False,
                   test_idx=0, battery_id=bt.id)
         tt.summarized_pvals = []
 
@@ -1198,11 +1237,19 @@ class Loader:
 
             # Fake pvalue according to the precomputed pval tables as we don't have now
             # the pvalue approximation - not enough reference data.
-            stat1 = Statistic(name='boolres-pval', value=1e-15 if sub['pval0_rej'] else 0.5, passed=not sub['pval0_rej'])
-            stat2 = Statistic(name='boolres-zscore', value=sub['zscore'], passed=not sub['pval0_rej'])
+            if 'halving' in sub and sub['halving']:
+                stat1 = Statistic(name='boolres-pval', value=sub['pvalue'], passed=sub['pvalue'] < (1./40000))
+                stat2 = Statistic(name='boolres-zscore', value=sub['zscore'], passed=not sub['pval0_rej'])
+                if idx == 0: tt.name = 'booltest_2'
+            else:
+                stat1 = Statistic(name='boolres-pval', value=1e-15 if sub['pval0_rej'] else 0.5, passed=not sub['pval0_rej'])
+                stat2 = Statistic(name='boolres-zscore', value=sub['zscore'], passed=not sub['pval0_rej'])
+                if idx == 0: tt.name = 'booltest'
+
             stest.stats = [stat1, stat2]
-            self.new_stats(stat1, stat1.name)
-            self.new_stats(stat2, stat2.name)
+            for x in stest.stats:
+                self.new_stats(x, x.name)
+
             num_rejects += 0 if stat1.passed else 1
             tt.summarized_pvals.append(stat1.value)
 
