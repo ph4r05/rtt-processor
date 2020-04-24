@@ -1238,11 +1238,11 @@ class Loader:
             # Fake pvalue according to the precomputed pval tables as we don't have now
             # the pvalue approximation - not enough reference data.
             if 'halving' in sub and sub['halving']:
-                stat1 = Statistic(name='boolres-pval', value=sub['pvalue'], passed=sub['pvalue'] < (1./40000))
+                stat1 = Statistic(name='boolres-pval', value=sub['pvalue'], passed=sub['pvalue'] >= alpha)
                 stat2 = Statistic(name='boolres-zscore', value=sub['zscore'], passed=not sub['pval0_rej'])
                 if idx == 0: tt.name = 'booltest_2'
             else:
-                stat1 = Statistic(name='boolres-pval', value=1e-15 if sub['pval0_rej'] else 0.5, passed=not sub['pval0_rej'])
+                stat1 = Statistic(name='boolres-pval', value=0.95 * alpha if sub['pval0_rej'] else 0.5, passed=not sub['pval0_rej'])
                 stat2 = Statistic(name='boolres-zscore', value=sub['zscore'], passed=not sub['pval0_rej'])
                 if idx == 0: tt.name = 'booltest'
 
