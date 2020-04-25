@@ -12,7 +12,7 @@ import itertools
 import collections
 import json
 import argparse
-from typing import Optional, List, Dict, Tuple, Union, Any
+from typing import Optional, List, Dict, Tuple, Union, Any, Sequence, Iterable, Collection
 
 
 # TODO: BoolTest extraction from RTT DB
