@@ -118,7 +118,7 @@ def process_syso2(loader, exps, rev_exp):
 
 
 class Exporter:
-    def __init__(self, loader=None):
+    def __init__(self, loader: Optional[Loader] = None):
         self.loader = loader
         self.experiment_ids = None
         self.experiments = None

@@ -737,6 +737,9 @@ class Loader:
         self.sids = {}  # type: Dict[int, Stest]
         self.picked_stats = None
         self.add_passed = False
+        self.thr_test_load = 1000
+        self.thr_variant_load = 2000
+        self.thr_stest_load = 10000
 
         self.last_bool_battery_id = 1 << 42
         self.last_bool_variant_id = 1 << 42
@@ -787,6 +790,8 @@ class Loader:
                             help='Experiment numbers to load')
         parser.add_argument('--exps-id', dest='experiment_ids', nargs=argparse.ZERO_OR_MORE, default=[], type=int,
                             help='Experiment IDs numbers to load')
+        parser.add_argument('--is-secmargins', dest='is_secmargins', type=int, default=1,
+                            help='Flag for security margins experiment')
 
         self.args, unparsed = parser.parse_known_args()
         logger.debug("Unparsed: %s" % unparsed)
@@ -882,7 +887,7 @@ class Loader:
     def process_test(self, force=False):
         if len(self.to_proc_test) == 0:
             return False
-        if len(self.to_proc_test) < 1000 and not force:
+        if len(self.to_proc_test) < self.thr_test_load and not force:
             return False
 
         ids = sorted(list([x.id for x in self.to_proc_test]))
@@ -911,7 +916,7 @@ class Loader:
     def process_variant(self, force=False):
         if len(self.to_proc_variant) == 0:
             return False
-        if len(self.to_proc_variant) < 2000 and not force:
+        if len(self.to_proc_variant) < self.thr_variant_load and not force:
             return False
 
         vids = sorted(list([x.id for x in self.to_proc_variant]))
@@ -971,7 +976,7 @@ class Loader:
     def process_stest(self, force=False):
         if len(self.to_proc_stest) == 0:
             return False
-        if len(self.to_proc_stest) < 10000 and not force:
+        if len(self.to_proc_stest) < self.thr_stest_load and not force:
             return False
 
         sids = sorted(list([x.id for x in self.to_proc_stest]))
@@ -1043,20 +1048,30 @@ class Loader:
         with self.conn.cursor() as c:
             # Load all experiments
             logger.info("Loading all experiments")
-            c.execute("""
-                SELECT id, name FROM experiments 
-                WHERE name LIKE '%SECMARGINPAPER%'
-            """)
+
+            if self.args.is_secmargins:
+                c.execute("""
+                    SELECT id, name FROM experiments 
+                    WHERE name LIKE '%SECMARGINPAPER%'
+                """)
+            else:
+                if not self.args.experiment_ids:
+                    raise ValueError('General experiment requires experiment_ids')
+
+                c.execute("""
+                    SELECT id, name FROM experiments 
+                    WHERE id IN(%s)
+                """ % (",".join(str(x) for x in self.args.experiment_ids)))
 
             wanted_exps = set([int(x) for x in self.args.experiments])
             wanted_ids = set([int(x) for x in self.args.experiment_ids])
 
             for result in c.fetchall():
                 eid, name = result
-                exp_info = self.break_exp(name)
-                if len(wanted_exps) > 0 and exp_info.id not in wanted_exps:
+                exp_info = self.break_exp(name) if self.args.is_secmargins else None
+                if self.args.is_secmargins and len(wanted_exps) > 0 and exp_info.id not in wanted_exps:
                     continue
-                if len(wanted_ids) > 0 and eid not in wanted_ids:
+                if self.args.is_secmargins and len(wanted_ids) > 0 and eid not in wanted_ids:
                     continue
 
                 self.experiments[eid] = Experiment(eid, name, exp_info)
@@ -1409,7 +1424,7 @@ class Loader:
             res_chars[char_str] += 1
             res_chars_tests[char_str].add(sdest)
 
-        exp_data = self.comp_exp_data()
+        exp_data = self.comp_exp_data() if self.args.is_secmargins else None
 
         # Data sizes -> tests -> test_config -> counts
         test_configs = collections.defaultdict(
