@@ -73,12 +73,13 @@ class Cleaner:
                 eid, name, status, sha, fsize = result[0], result[1], result[2], result[6], result[7]
                 data_file_id = result[8]
 
-                if status == 'pending':
+                if status == 'pending' or status == 'finished':
                     continue
                 if sha is None and fsize is None:
                     continue
                 if (fsize is not None and fsize >= 1024) or (sha is not None and sha != EMPTY_SHA_STR):
                     continue
+
                 if data_file_id is None:
                     logger.info('Suspicious ecp id %s, but empty file id %s' % (eid, result,))
                     continue
@@ -105,7 +106,7 @@ class Cleaner:
 
                 # Update experiment if finished
                 logger.info('Update experiments')
-                nstatus = 'running' if status == 'running' else 'pending'
+                nstatus = 'pending'
                 nhash = None if data_file_id is not None else sha
                 nfsize = None if data_file_id is not None else fsize
                 sql_exps = 'UPDATE experiments SET status=%s, run_started=NULL, run_finished=NULL, ' \
