@@ -1,4 +1,5 @@
 import sys
+from functools import lru_cache
 from scipy import misc
 
 if sys.version_info >= (3, 2):
@@ -17,6 +18,22 @@ else:
 @lru_cache(maxsize=1024)
 def comb(n, k, exact=False):
     return scipy_comb(n, k, exact=exact)
+
+
+@lru_cache(maxsize=8192)
+def comb_cached(n, k):
+    """
+    Computes C(n,k) - combinatorial number of N elements, k choices
+    :param n:
+    :param k:
+    :return:
+    """
+    if (k > n) or (n < 0) or (k < 0):
+        return 0
+    val = 1
+    for j in range(min(k, n - k)):
+        val = (val * (n - j)) // (j + 1)
+    return val
 
 
 def rank(s, n):
