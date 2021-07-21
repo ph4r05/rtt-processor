@@ -1,6 +1,7 @@
 import sys
 from functools import lru_cache
 from scipy import misc
+import scipy.misc
 
 if sys.version_info >= (3, 2):
     from functools import lru_cache
