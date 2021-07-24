@@ -20,6 +20,16 @@ logger = logging.getLogger(__name__)
 coloredlogs.install(level=logging.INFO)
 
 
+ILENS = {
+    'std_mersenne_twister': 4,
+    'std_lcg': 4,
+    'std_subtract_with_carry': 4,
+    'testu01-ulcg': 6,  # estimate, precise number is computed from constants
+    'testu01-umrg': 6,  # estimate, precise number is computed from constants
+    'testu01-uxorshift': 8 * 4,
+}
+
+
 class AlgRec:
     def __init__(self, alg, alg_type, alg_round, tv_size, js, ipath=None, paths=None):
         self.alg = alg
@@ -100,7 +110,9 @@ class TaroProc:
         # Generate
         for rec in alg_acc:
             js = copy.deepcopy(rec.js)
-            blen = rec.tv_size
+            ilen = blen = rec.tv_size
+            if rec.alg_type == 'prng' and rec.alg in ILENS:
+                ilen = ILENS[rec.alg]
 
             # if alg_round is None:
             #     logger.info(f'null rounds: {alg} path: {ipath}')
@@ -132,26 +144,30 @@ class TaroProc:
 
                 # input type
                 if src_type == 'ctr':
-                    jse['note'] += f'-{blen * 8}sbit-offset-{ix}'
-                    inp_js = make_ctr_core(blen, '%02x' % ix)
+                    jse['note'] += f'-{ilen * 8}sbit-offset-{ix}'
+                    inp_js = make_ctr_core(ilen, '%02x' % ix)
 
                 elif src_type == 'sac':
-                    jse['note'] += f'-{blen * 8}sbit'
+                    jse['note'] += f'-{ilen * 8}sbit'
                     inp_js = {'type': 'sac'}
 
                 elif src_type == 'hw':
-                    weight_comp = comp_hw_weight(blen, self.args.ec, min_data=data_size)
+                    data_size_in = int(math.ceil(data_size / blen) * ilen)  # inp size != out size for prngs
+                    weight_comp = comp_hw_weight(ilen, self.args.ec, min_data=data_size_in)
                     try:
                         tv_count, offset, weight, offset_idx, offset_range, rem_vectors, gen_data_mb = comp_hw_data(
-                            blen, weight_comp, None, jse['tv_count'], ix / self.args.ec, data_size
+                            ilen, weight_comp, None, jse['tv_count'], ix / self.args.ec, data_size_in
                         )
                     except Exception as e:
-                        logger.error(f"Exception in hw gen {e}, ipath: {rec.ipath}, wcomp: {weight_comp}, tv-size: {blen}, dsize {data_size} {str_sz}", exc_info=e)
-                        raise
+                        logger.error(f"Exception in hw gen {e}, ipath: {rec.ipath}, alg: {rec.alg}, "
+                                     f"wcomp: {weight_comp}, tv-size: {blen}, ilen: {ilen}, "
+                                     f"dsize {data_size}, dsizeInp: {data_size_in}, {str_sz}", exc_info=e)
+                        # raise
+                        continue
 
                     inp_js = make_hw_core(offset, weight_comp)
                     src_note = '%sbit-hw%s-offsetidx-%s-offset-%s-r%.2f-vecsize-%s-%s' % (
-                           blen * 8, weight, offset_idx, '-'.join(map(str, offset)), offset_range, rem_vectors, str_sz)
+                           ilen * 8, weight, offset_idx, '-'.join(map(str, offset)), offset_range, rem_vectors, str_sz)
 
                     jse['note'] += f'-{src_note}'
 
