@@ -14,7 +14,7 @@ coloredlogs.CHROOT_FILES = []
 coloredlogs.install(level=logging.INFO, use_chroot=False)
 
 
-def process_syso(tests):
+def process_syso(tests, add_aux_res=False):
     """
     Export to JSON in a format drafted with Syso
     :param tests:
@@ -54,9 +54,13 @@ def process_syso(tests):
                     ('variant_type', cfs),
                     ('variant_id', vv.id),
                     ('exid', tt.battery.exp.id),
-                    ('data_type', tt.battery.exp.name),
+                    ('data_type', tt.battery.exp.aux_name if tt.battery.exp.aux_name else tt.battery.exp.name),
+                    ('aux_res', None),
                     ('subs', tsubs),
                 ])
+
+                if add_aux_res:
+                    cobj['aux_res'] = tt.battery.exp.aux_res
 
                 for ssidx, ss in enumerate(gs):
                     cstats = [collections.OrderedDict([

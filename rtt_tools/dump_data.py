@@ -682,38 +682,66 @@ class Battery:
 
 
 class ExpInfo:
-    def __init__(self, eid=None, meth=None, seed=None, osize=None, size=None, fnc=None):
+    def __init__(self, eid=None, meth=None, seed=None, osize=None, size=None, fnc=None,
+                 fnc_name=None, fnc_round=None, fnc_block=None, fnc_type=None, spread=None, otype=None):
         self.id = eid
         self.meth = meth
         self.seed = seed
         self.osize = osize
         self.size = size
         self.fnc = fnc
-        self.fnc_name = None
-        self.fnc_round = None
-        self.fnc_block = None
+        self.fnc_name = fnc_name
+        self.fnc_round = fnc_round
+        self.fnc_block = fnc_block
+        self.fnc_type = fnc_type
+        self.spread = spread
         self.key = None
         self.offset = None
         self.derivation = None
+        self.otype = otype
         self.aux = {}
 
     def __repr__(self):
-        return 'Einfo(id=%r, m=%r, s=%r, si=%r, osi=%r, fname=%r, fr=%r, fb=%r, k=%r, off=%r, der=%r)' % (
+        flds = []
+        if self.key:
+            flds.append('k=%r' % self.key)
+        if self.offset:
+            flds.append('off=%r' % self.offset)
+        if self.derivation:
+            flds.append('der=%r' % self.derivation)
+        if self.fnc_type:
+            flds.append('ftype=%r' % self.fnc_type)
+        if self.spread:
+            flds.append('spr=%r' % self.spread)
+        if self.otype:
+            flds.append('otype=%r' % self.otype)
+
+        sflds = ", ".join(flds)
+        return 'Einfo(id=%r, m=%r, s=%r, si=%r, osi=%r, fname=%r, fr=%r, fb=%r%s)' % (
             self.id, self.meth, self.seed, self.size, self.osize, self.fnc_name, self.fnc_round, self.fnc_block,
-            self.key, self.offset, self.derivation
+            (', %s' % sflds) if sflds else ''
         )
 
 
 class Experiment:
-    def __init__(self, eid, name, exp_info):
+    def __init__(self, eid, name, exp_info, data_file_sha256=None, data_file_size=None,
+                 config_data=None, source_data=None, config_data_id=None, source_data_id=None,):
         self.id = eid
         self.name = name
         self.exp_info = exp_info  # type: ExpInfo
         self.batteries = {}  # type: Dict[int, Battery]
+        self.config_data = config_data
+        self.source_data = source_data
+        self.config_data_id = config_data_id
+        self.source_data_id = source_data_id
+        self.data_file_sha256 = data_file_sha256
+        self.data_file_size = data_file_size
         self.aux = {}
+        self.aux_res = {}
+        self.aux_name = None
 
     def __repr__(self):
-        return 'Exp(%s)' % self.name
+        return 'Exp(%s, %s)' % (self.id, self.name)
 
 
 def pick_one_statistic(stats: List[Statistic], preflist=None, default_first=True) -> Optional[Statistic]:
@@ -792,6 +820,10 @@ class Loader:
                             help='Experiment IDs numbers to load')
         parser.add_argument('--is-secmargins', dest='is_secmargins', type=int, default=1,
                             help='Flag for security margins experiment')
+        parser.add_argument('--is-ph4-sm', dest='is_ph4_sm', type=int, default=1,
+                            help='Flag for PH4-SM experiment')
+        parser.add_argument('--is-ph4-mpc', dest='is_ph4_mpc', type=int, default=1,
+                            help='Flag for PH4-MPC experiment')
 
         self.args, unparsed = parser.parse_known_args()
         logger.debug("Unparsed: %s" % unparsed)
@@ -876,6 +908,65 @@ class Loader:
             ei.fnc_block = m.group(3)
         return ei
 
+    def break_exp_ph4(self, s):
+        m = re.match(r'^PH4-SM-[\d]+-([\w-]+?)-t:([\w]+?)-r:([\w]+?)-b:([\w]+?)-s:([\w]+?)-e:([\w]+?)-i:([\w]+)-(.+?)?$', s)
+        if m is None:
+            return ExpInfo()
+
+        psize = m.group(5)
+        if psize == '10MiB':
+            psize = 1024*1024*10
+        elif psize == '100MiB':
+            psize = 1024*1024*100
+        elif psize == '1000MiB':
+            psize = 1024*1024*1024
+
+        rc = m.group(3)
+        ei = ExpInfo(eid=int(m.group(6)), meth=m.group(7), seed=None, osize=psize, size=psize,
+                     fnc=m.group(1), fnc_name=m.group(1),
+                     fnc_round=int(rc) if rc is not None and rc != 'x' else None,
+                     fnc_block=int(m.group(4)) if m.group(4) else None,
+                     fnc_type=m.group(2))
+        return ei
+
+    def break_exp_ph4_mpc(self, s):
+        m = re.match(r'^(?:([\w]+)-)?testmpc([\d])+-([\w-]+?)-r(?:([\w]+?)|([\d]-[\d]-[\d]))-inp-([\w]+?)(\d+)-b([\w]+?)(?:-w([\w]+?))?-spr-([\w]*)-s([\w]+)(.+?)?$', s)
+        if m is None:
+            return ExpInfo()
+
+        psize = m.group(11)
+        if psize == '10MB':
+            psize = 1024*1024*10
+        elif psize == '100MB':
+            psize = 1024*1024*100
+        elif psize == '1000MB':
+            psize = 1024*1024*1024
+
+        fnc = fnc_bare = m.group(3)
+        fnc_ext = m.group(1)
+        if re.match(r'^S[\d]', fnc_bare) and fnc_ext:
+            fnc = '%s-%s' % (fnc_ext, fnc_bare)
+
+        otype = None
+        if '-bin-' in fnc:
+            otype = 'bin'
+        if '-pri-' in fnc:
+            otype = 'pri'
+
+        fnc = fnc.replace('-bin-raw', '')
+        fnc = fnc.replace('-pri-raw', '')
+        rc1 = m.group(4)
+        rc2 = m.group(5)
+        rc = int(rc1) if rc1 is not None and rc1 != 'x' else rc2
+        ei = ExpInfo(eid=int(m.group(7)), meth=m.group(6), seed=None, osize=psize, size=psize,
+                     fnc=fnc, fnc_name=fnc,
+                     fnc_round=rc,
+                     fnc_block=int(m.group(8)) if m.group(8) else None,
+                     fnc_type=None,
+                     spread=m.group(10),
+                     otype=otype)
+        return ei
+
     def queue_summary(self):
         return len(self.to_proc_test), len(self.to_proc_variant), len(self.to_proc_stest)
 
@@ -950,7 +1041,7 @@ class Loader:
                 cres = None
                 for cc in g:
                     cres = cc
-                vidmap[k].results = cres
+                vidmap[k].result = cres
 
             # All subtests
             c.execute("""
@@ -1048,33 +1139,99 @@ class Loader:
         with self.conn.cursor() as c:
             # Load all experiments
             logger.info("Loading all experiments")
+            select_prefix = "SELECT id, name, data_file_size, data_file_sha256, config_file_id, data_file_id " \
+                            "FROM experiments "
+            wheres = []
 
             if self.args.is_secmargins:
-                c.execute("""
-                    SELECT id, name FROM experiments 
-                    WHERE name LIKE '%SECMARGINPAPER%'
-                """)
+                logger.info('Loading sec margins experiments')
+                wheres.append("name LIKE '%%SECMARGINPAPER%%'")
+
+            if self.args.is_ph4_sm:
+                logger.info('Loading ph4-sm experiments ')
+                wheres.append("name LIKE 'PH4-SM-%%'")
+
+            if self.args.is_ph4_mpc:
+                logger.info('Loading ph4-sm-mpc experiments ')
+                wheres.append("name LIKE 'testmpc%%'")
+
+            if wheres:
+                sel_sql = "%s WHERE %s" % (select_prefix, " OR ".join(wheres))
+                logger.info('Selection SQL: %s' % (sel_sql, ))
+                c.execute(sel_sql)
+
             else:
                 if not self.args.experiment_ids:
                     raise ValueError('General experiment requires experiment_ids')
 
-                c.execute("""
-                    SELECT id, name FROM experiments 
-                    WHERE id IN(%s)
-                """ % (",".join(str(x) for x in self.args.experiment_ids)))
+                sel_sql = "%s WHERE id IN(%s)" % (select_prefix, ",".join(str(x) for x in self.args.experiment_ids))
+                logger.info('Selection SQL: %s' % (sel_sql,))
+                c.execute(sel_sql)
 
             wanted_exps = set([int(x) for x in self.args.experiments])
             wanted_ids = set([int(x) for x in self.args.experiment_ids])
+            config_to_load = collections.defaultdict(list)  # type: {int: List[Experiment]}
+            data_to_load = collections.defaultdict(list)  # type: {int: List[Experiment]}
+            inp_file_dup_hashes = collections.defaultdict(list)  # type: {str: List[Experiment]}
+            inp_file_dup = set()
+            is_sm = self.args.is_secmargins
+            is_ph4_sm = self.args.is_ph4_sm
+            is_ph4_mpc = self.args.is_ph4_mpc
+            no_file_sizes = []
 
-            for result in c.fetchall():
-                eid, name = result
-                exp_info = self.break_exp(name) if self.args.is_secmargins else None
-                if self.args.is_secmargins and len(wanted_exps) > 0 and exp_info.id not in wanted_exps:
+            for result in c.fetchall():  # break_exp_ph4
+                eid, name, data_file_size, data_file_sha256, config_file_id, data_file_id = result
+                exp_info = None
+                if is_sm:
+                    exp_info = self.break_exp(name)
+                if is_ph4_sm and (exp_info is None or exp_info.fnc is None):
+                    exp_info = self.break_exp_ph4(name)
+                if is_ph4_mpc and (exp_info is None or exp_info.fnc is None):
+                    exp_info = self.break_exp_ph4_mpc(name)
+
+                if (is_sm or is_ph4_sm) and len(wanted_exps) > 0 and exp_info.id not in wanted_exps:
                     continue
-                if self.args.is_secmargins and len(wanted_ids) > 0 and eid not in wanted_ids:
+                if (is_sm or is_ph4_sm) and len(wanted_ids) > 0 and eid not in wanted_ids:
                     continue
 
-                self.experiments[eid] = Experiment(eid, name, exp_info)
+                exp_obj = Experiment(eid, name, exp_info,
+                                     data_file_sha256=data_file_sha256, data_file_size=data_file_size,
+                                     config_data_id=config_file_id, source_data_id=data_file_id)
+
+                # Add structured info to the exp file for better processing (larger file though)
+                if (is_ph4_sm or is_ph4_mpc) and exp_info:
+                    exp_obj.aux_res = collections.OrderedDict([
+                        ('tp', exp_info.fnc_type),
+                        ('f', exp_info.fnc_name),
+                        ('s', exp_info.size),
+                        ('m', exp_info.meth),
+                        ('r', exp_info.fnc_round),
+                        ('e', exp_info.id),
+                    ])
+
+                self.experiments[eid] = exp_obj
+
+                if (is_sm or is_ph4_sm) and exp_info.fnc is None:
+                    logger.warning('Could not parse exp %s' % (exp_obj,))
+                    continue
+
+                if is_ph4_sm and data_file_size is not None and exp_info.size is not None and abs(data_file_size - exp_info.size) > 1024*1024:
+                    logger.warning('Data file size does not match exp size for eid %s, %s, %s'
+                                   % (eid, exp_obj, exp_info))
+
+                if data_file_sha256 is None:
+                    no_file_sizes.append(exp_obj)
+                else:
+                    inp_file_dup_hashes[data_file_sha256].append(exp_obj)
+
+                if len(inp_file_dup_hashes[data_file_sha256]) > 1:
+                    inp_file_dup.add(data_file_sha256)
+
+                if config_file_id:
+                    config_to_load[config_file_id].append(exp_obj)
+
+                if data_file_id:
+                    data_to_load[data_file_id].append(exp_obj)
 
             # Load batteries for all experiments, chunked.
             eids = sorted(list(self.experiments.keys()))
@@ -1084,8 +1241,71 @@ class Loader:
             if self.args.small:
                 eids = eids[0:2]
 
-            logger.info("Loading all batteries, len: %s" % len(eids))
+            # Check data duplicates
+            logger.info("Number of uncomputed file sizes: %s" % (len(no_file_sizes),))
+            for exp_obj in no_file_sizes:
+                logger.warning("No fsize for: %s" % (exp_obj,))
 
+            logger.info("Number of input duplicates: %s" % (len(inp_file_dup),))
+            for ks in inp_file_dup:
+                logger.warning("Duplicate input hash %s for:\n  - %s" % (ks, "\n  - ".join(map(str, inp_file_dup_hashes[ks]))))
+
+            # Load configs for experiments
+            logger.info("Number of config data files to load: %s" % (len(config_to_load),))
+            for bs in chunks(list(config_to_load.items()), 100):
+                c.execute("""
+                            SELECT `id`, `config_name`, `config_data`
+                            FROM rtt_config_files 
+                            WHERE id IN (%s)
+                          """ % ','.join([str(x[0]) for x in bs]))
+
+                tdict = dict(bs)
+                for result in c.fetchall():
+                    cid, cname, cdata = result
+                    for eobj in tdict[cid]:  # type: Experiment
+                        eobj.config_data = cdata
+
+            # Load source data configuration for experiments
+            logger.info("Number of source config data files to load: %s" % (len(data_to_load),))
+            for bs in chunks(list(data_to_load.items()), 100):
+                c.execute("""
+                            SELECT `id`, `provider_name`, `provider_config`, `provider_config_name`
+                            FROM rtt_data_providers 
+                            WHERE id IN (%s)
+                          """ % ','.join([str(x[0]) for x in bs]))
+
+                tdict = dict(bs)
+                for result in c.fetchall():
+                    pid, pname, pdata, pcfgname = result
+                    for eobj in tdict[pid]:  # type: Experiment
+                        eobj.source_data = pdata
+
+            # Load aux data from datafile config.
+            # Name fix for MPC functions from config data
+            for eid in self.experiments:
+                exp = self.experiments[eid]
+                if not is_ph4_mpc or not exp.name.startswith('testm'):
+                    continue
+                if not exp.source_data:
+                    logger.info('Source data not found for %s' % (exp.name,))
+                    continue
+                try:
+                    js = json.loads(exp.source_data)
+                except Exception as e:
+                    logger.error("Error json parsing: %s" % (e,))
+                    continue
+
+                execs = js['stream']['exec'] if 'stream' in js and 'exec' in js['stream'] else None
+                if execs is None:
+                    logger.info('Exec not found for %s' % (exp.name, ))
+                    continue
+
+                match = re.match(r'.*/([\w]+)\.sage\s.*', execs) if execs is not None else None
+                if match:
+                    exp.aux_name = '%s-%s' % (match.group(1), exp.name)
+
+            # Experiment results data loading
+            logger.info("Loading all batteries, len: %s" % len(eids))
             for bs in chunks(eids, 10):
                 c.execute("""
                                 SELECT `id`, `name`, `passed_tests`,
