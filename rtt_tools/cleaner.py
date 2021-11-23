@@ -1,6 +1,7 @@
 #! /usr/bin/python3
 # @author: Dusan Klinec (ph4r05)
 # pandas matplotlib numpy networkx graphviz scipy dill configparser coloredlogs mysqlclient requests sarge cryptography paramiko shellescape
+import os
 
 from rtt_tools.common.rtt_db_conn import *
 import configparser
@@ -436,6 +437,66 @@ class Cleaner:
 
             self.conn.commit()
             logger.info('Experiment %s solved' % (eid,))
+
+    def comp_new_rounds(self, specs, tmpdir='/tmp/rspecs', smidx=5):
+        """
+        Generates submit_experiment for a new rounds to compute.
+        specs is: fname -> meth -> [[exids], [rounds]
+        """
+        os.makedirs(tmpdir, exist_ok=True)
+
+        eids_map = collections.defaultdict(lambda: set())
+        for fname in specs:
+            for meth in specs[fname]:
+                rec = specs[fname][meth]
+                for cexid in rec[0]:
+                    for cround in rec[1]:
+                        eids_map[cexid].add(cround)
+
+        file_names = []
+        with self.conn.cursor() as c:
+            logger.info("Generating new round specs, eids: %s" % (', '.join(map(str, list(eids_map.keys())))))
+            sql_sel = """SELECT e.id, name, dp.`provider_config`, dp.provider_name, dp.id, dp.provider_config_name
+                            FROM experiments e
+                            JOIN rtt_data_providers dp ON e.data_file_id = dp.id
+                            WHERE e.id IN (%s)
+                              """ % (','.join(['%s' for _ in eids_map]),)
+            logger.info('SQL: %s' % sql_sel)
+
+            c.execute(sql_sel, list(eids_map.keys()))
+
+            for result in c.fetchall():
+                eid, name, config, pname = result[0], result[1], result[2], result[3]
+                config_js = json.loads(config)
+
+                if pname == 'cryptostreams':
+                    for cround in sorted(list(eids_map[eid])):
+                        config_js['stream']['round'] = cround
+                        nname = re.sub(r'-r:([\d]+)-', '-r:%s-' % cround, name)
+                        nname = re.sub(r'^PH4-SM-([\d]+)-', 'PH4-SM-%02d-' % smidx, nname)
+                        config_js['note'] = nname
+
+                        ssize = '100' if ('-s:100MiB-' in name or '-s:100MB' in name) else '10'
+                        ptype = '--cryptostreams-config'
+                        fname = nname.replace(':', '_').replace('.json', '') + '.json'
+                        logger.info('  Eid %s -> r=%s, name=%s, fname=%s' % (eid, cround, nname, fname))
+
+                        file_names.append((nname, fname, ssize, ptype))
+                        with open(os.path.join(tmpdir, fname), 'w+') as fh:
+                            json.dump(config_js, fh, indent=2)
+
+                elif pname == 'rtt-data-gen':
+                    logger.info('RTT data gen for %s' % (name, ))
+                    continue
+
+                else:
+                    print('Could not process provider %s' % (pname,))
+                    continue
+
+        with open(os.path.join(tmpdir, '__enqueue.sh'), 'w+') as fh:
+            fh.write('#!/bin/bash\n')
+            for nname, fname, ssize, ptype in file_names:
+                fh.write(f"submit_experiment --all_batteries --name '{nname}' --cfg '/home/debian/rtt-home/RTTWebInterface/media/predefined_configurations/{ssize}MB.json' {ptype} '{fname}'\n")
 
 
 def main():
