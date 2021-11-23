@@ -132,6 +132,311 @@ class Cleaner:
     def main(self, args=None):
         self.load(args)
 
+    def fix_mpcexps(self):
+        broken_exps = ["testmpc02-lowmc-s80a-bin-raw-r5-inp-lhw03-b32-w3-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r10-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r90-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r11-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r20-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r3-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r9-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r8-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r4-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r11-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r5-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128a-bin-raw-r11-inp-lhw03-b32-w4-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r190-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r5-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r210-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r70-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r20-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r130-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r6-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r8-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r10-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r5-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r4-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r6-inp-lhw03-b32-w3-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r200-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r10-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r7-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r11-inp-lhw03-b32-w4-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r3-inp-lhw03-b32-w3-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r50-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r4-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r90-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r110-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r10-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r8-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r30-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r3-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r90-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r5-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r220-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r9-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r4-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r150-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r230-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r90-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128a-bin-raw-r6-inp-lhw03-b32-w4-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r7-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128a-bin-raw-r8-inp-lhw03-b32-w3-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r110-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128a-bin-raw-r7-inp-lhw03-b32-w4-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r6-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r70-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r8-inp-lhw03-b32-w3-spr--s10MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r70-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r40-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r70-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r30-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r3-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r10-inp-lhw03-b32-w3-spr--s10MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r80-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128a-bin-raw-r5-inp-lhw03-b32-w4-spr--s100MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r20-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r120-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r20-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r4-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r60-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r9-inp-lhw03-b32-w4-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r7-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r160-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r70-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r240-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128a-bin-raw-r4-inp-lhw03-b32-w3-spr--s10MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r100-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r170-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r7-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r7-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r11-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128a-bin-raw-r8-inp-lhw03-b32-w4-spr--s100MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r8-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r140-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r8-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r20-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r50-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r9-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r9-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r9-inp-lhw03-b32-w3-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r160-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r11-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r170-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r7-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r200-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r11-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128a-bin-raw-r7-inp-lhw03-b32-w3-spr--s10MB.json",
+                       "testmpc02-lowmc-s128a-bin-raw-r10-inp-lhw03-b32-w4-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r5-inp-lhw03-b32-w4-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r6-inp-lhw03-b32-w4-spr--s100MB.json",
+                       "testmpc02-lowmc-s128a-bin-raw-r5-inp-lhw03-b32-w3-spr--s10MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r9-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r30-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r3-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r10-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r180-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r40-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r4-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r8-inp-lhw03-b32-w4-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r50-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r7-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r100-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r5-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r130-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r40-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r7-inp-lhw03-b32-w4-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r80-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r80-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r5-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r30-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r140-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r60-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r30-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r11-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r30-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128a-bin-raw-r3-inp-lhw03-b32-w3-spr--s10MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r11-inp-lhw03-b32-w3-spr--s10MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r60-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r4-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r60-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r5-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r100-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r11-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r8-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r4-inp-lhw03-b32-w4-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r40-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r3-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r6-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r60-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128a-bin-raw-r10-inp-lhw03-b32-w3-spr--s10MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r9-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r180-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r10-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r9-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r100-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r210-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r6-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r11-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r20-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r6-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r8-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r6-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128a-bin-raw-r11-inp-lhw03-b32-w3-spr--s10MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r4-inp-lhw03-b32-w3-spr--s10MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r80-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r60-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r3-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r6-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r240-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r4-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r10-inp-lhw03-b32-w4-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r190-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r50-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128a-bin-raw-r6-inp-lhw03-b32-w3-spr--s10MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r110-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r3-inp-lhw03-b32-w4-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r8-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r150-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r5-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128a-bin-raw-r3-inp-lhw03-b32-w4-spr--s100MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r6-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r3-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128a-bin-raw-r9-inp-lhw03-b32-w3-spr--s10MB.json",
+                       "testmpc02-lowmc-s128d-bin-raw-r50-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r9-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r230-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r120-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r70-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128a-bin-raw-r9-inp-lhw03-b32-w4-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r50-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r80-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128c-bin-raw-r40-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r10-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r7-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r40-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r7-inp-lhw03-b32-w3-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r3-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s128a-bin-raw-r4-inp-lhw03-b32-w4-spr--s100MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r80-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r110-inp-lhw03-b16-w5-spr--s100MB.json",
+                       "testmpc02-lowmc-s80a-bin-raw-r10-inp-lhw03-b16-w4-spr--s10MB.json",
+                       "testmpc02-lowmc-s128b-bin-raw-r220-inp-lhw03-b16-w4-spr--s10MB.json"]
+
+        def rename_lhw(inp, to):
+            res = re.sub(r'-inp-([\w]+?)([\d]+)-', '-inp-\\1!XXXX-', inp)
+            return res.replace('!XXXX', '%02d' % to)
+
+        tests_all = json.load(open('testmpc02-exps.json'))
+        renames = []
+        for broken in broken_exps:
+            regex = broken.replace('.json', '')
+            regex = re.sub(r'-inp-([\w]+?)([\d]+)-', '-inp-\\1[\\\\d]+-', regex)
+            sel = []
+            for ctest in tests_all:
+                if re.match(regex, ctest):
+                    m = re.match(r'.*-inp-([\w]+?)([\d]+)-.*', ctest)
+                    sel.append((ctest, int(m.group(2))))
+
+            seqs = [x[1] for x in sel]
+            seqss = sorted(seqs)
+
+            if seqss == [0, 2, 3]:
+                pass
+            elif seqss == [1, 2, 3]:
+                pass
+            else:
+                print(f'Broken: {broken} all related: {[x[1] for x in sel]}, {sel}')
+                continue
+
+            for replace_ix in range(1, 4):
+                csel = [x for x in sel if x[1] == replace_ix]
+                if not csel:
+                    continue
+                renames.append((replace_ix, rename_lhw(csel[0][0], replace_ix - 1), csel[0][0]))
+
+        renames.sort(key=lambda x: x[0])
+        renames_map = {x[2]: (x[0], x[1]) for x in renames}
+
+        with self.conn.cursor() as c:
+            logger.info("Processing experiments")
+
+            c.execute("""SELECT id, name, status, created, run_started, run_finished, data_file_sha256, data_file_size, 
+                                 data_file_id FROM experiments 
+                                 WHERE id >= %s
+                              """ % (self.exp_id_low,))
+
+            eid_data = {}
+            for result in c.fetchall():
+                eid, name, status, sha, fsize = result[0], result[1], result[2], result[6], result[7]
+                if name in renames_map:
+                    eid_data[name] = eid
+
+            for ren in renames:
+                if ren[2] not in eid_data:
+                    continue
+                eid = eid_data[ren[2]]
+
+                sql_exps = 'UPDATE experiments SET name=%s WHERE id=%s'
+                print(f'Updating {eid} to {ren[1]}')
+                # try_execute(lambda: c.execute(sql_exps, (ren[1], eid,)),
+                #             msg="Update experiment with ID %s" % eid)
+
+            self.conn.commit()
+            logger.info('Experiment %s solved' % (eid,))
+
+    def fix_colon(self):
+        with self.conn.cursor() as c:
+            logger.info("Processing experiments")
+
+            c.execute("""SELECT id, name, status, created, run_started, run_finished, data_file_sha256, data_file_size, 
+                                 data_file_id FROM experiments 
+                                 WHERE id >= %s
+                              """ % (self.exp_id_low,))
+
+            renames = []
+            for result in c.fetchall():
+                eid, name, status, sha, fsize = result[0], result[1], result[2], result[6], result[7]
+                if 'stream:cipher' in name:
+                    renames.append((eid, name))
+
+            for eid, name in renames:
+                nname = name.replace('stream:cipher', 'stream_cipher')
+
+                sql_exps = 'UPDATE experiments SET name=%s WHERE id=%s'
+                print(f'Updating {eid} to {nname}')
+                try_execute(lambda: c.execute(sql_exps, (nname, eid,)),
+                            msg="Update experiment with ID %s" % eid)
+
+            self.conn.commit()
+            logger.info('Experiment %s solved' % (eid,))
+
+    def fix_lowmc(self):
+        with self.conn.cursor() as c:
+            logger.info("Processing experiments")
+
+            c.execute("""SELECT e.id, name, dp.`provider_config`
+                            FROM experiments e
+                            JOIN rtt_data_providers dp ON e.data_file_id = dp.id
+                            WHERE e.id >= %s and name LIKE '%%lowmc-s80a%%'
+                              """ % (self.exp_id_low,))
+
+            renames = []
+            for result in c.fetchall():
+                eid, name, config, = result[0], result[1], result[2]
+                config_js = json.loads(config)
+                block_size = config_js['input_files']['CONFIG1.JSON']['data']['stream']['block_size_bits']
+                if block_size == 128:
+                    renames.append((eid, name, name.replace('lowmc-s80a', 'lowmc-s80b')))
+
+            for eid, oname, nname in renames:
+                sql_exps = 'UPDATE experiments SET name=%s WHERE id=%s'
+                print(f'Updating {eid} to {nname}')
+                try_execute(lambda: c.execute(sql_exps, (nname, eid,)),
+                            msg="Update experiment with ID %s" % eid)
+
+            self.conn.commit()
+            logger.info('Experiment %s solved' % (eid,))
+
 
 def main():
     l = Cleaner()
