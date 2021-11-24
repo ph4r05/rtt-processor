@@ -4,3 +4,6 @@
 venv/
 **/__pycache__/**
 data/
+rtt-data-graphs
+*.zip
+.pytest_cache
