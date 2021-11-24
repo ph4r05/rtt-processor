@@ -801,6 +801,10 @@ def generate_stream_col(algorithm, data_size, cround=1, tv_size=16, key_size=16,
     return generate_cfg_col('stream_cipher', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix)
 
 
+def generate_prng_col(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix=''):
+    return generate_cfg_col('prng', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix)
+
+
 def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
                      do_sac=False):
     """
@@ -815,7 +819,8 @@ def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=16, key_s
     agg_inputs = []
     is_block = alg_type == 'block'
     is_stream = alg_type == 'stream_cipher'
-    if not is_block and not is_stream:
+    is_prng = alg_type == 'prng'
+    if not is_block and not is_stream and not is_prng:
         raise ValueError('Unknown alg type: %s' % (alg_type,))
 
     # CTR
@@ -885,6 +890,13 @@ def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=16, key_s
             tpl['stream']['generator'] = "pcg32"
         elif is_block:
             tpl['stream']['init_frequency'] = "1"
+        elif is_prng:
+            tpl['stream'] = {
+                "type": "prng",
+                "algorithm": algorithm,
+                "reseed_for_each_test_vector": True,
+                "seeder": key_config
+            }
 
         agg_scripts.append(ExpRec(ename=note, ssize=size_mbs, fname=fname, tpl_file=tpl, cfg_type='cryptostreams-config'))
     return agg_scripts
