@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import os
+from typing import List
 
 import scipy.misc
 from functools import lru_cache
 import math
 import itertools
 import functools
+import binascii
 import json
 import logging
 import coloredlogs
@@ -42,6 +45,47 @@ MODULI = {
     'Bin161': 2**161,
     'Bin255': 2**255,
 }
+
+
+class ExpRec:
+    def __init__(self, ename, ssize, fname, tpl_file, cfg_type=None):
+        self.ename = ename
+        self.ssize = ssize
+        self.fname = fname
+        self.tpl_file = tpl_file
+        self.cfg_type = cfg_type
+
+    def __eq__(self, o: object) -> bool:
+        return (self.ename, self.ssize, self.fname, self.cfg_type, self.tpl_file) \
+               == (o.ename, o.ssize, o.fname, o.cfg_type, o.tpl_file) if isinstance(o, ExpRec) else super().__eq__(o)
+
+    def __repr__(self) -> str:
+        return f'ExpRec({self.ename}, {self.ssize}, {self.fname}, {self.cfg_type})'
+
+    def __hash__(self) -> int:
+        return hash((self.ename, self.ssize, self.fname, self.cfg_type, self.tpl_file))
+
+
+class StreamRec:
+    def __init__(self, stype=None, sdesc=None, sscript=None, expid=None, seed=None):
+        self.stype = stype
+        self.sdesc = sdesc
+        self.sscript = sscript
+        self.expid = expid
+        self.seed = seed
+
+
+class HwConfig:
+    def __init__(self, script=None, core=None, weight=None, offset=None,
+                 offset_range=None, rem_vectors=None, gen_data_mb=None, note=None):
+        self.script = script
+        self.core = core
+        self.weight = weight
+        self.offset = offset
+        self.offset_range = offset_range
+        self.rem_vectors = rem_vectors
+        self.gen_data_mb = gen_data_mb
+        self.note = note
 
 
 @lru_cache(maxsize=1024)
@@ -108,7 +152,7 @@ def unrank(i, n, k):
     return c
 
 
-def make_ctr_config(blen=31, offset='00', tv_count=None, min_data=None):
+def make_ctr_config(blen=31, offset='00', tv_count=None, min_data=None, core_only=False) -> dict:
     """
     Generate counter CryptoStreams config with configurable offset.
      - blen is block width in bytes
@@ -131,6 +175,9 @@ def make_ctr_config(blen=31, offset='00', tv_count=None, min_data=None):
         raise ValueError('Condition on minimal data could not be fulfilled')
 
     note = 'plaintext-ctr-%sbit-%.2fMB' % (blen*8, data_mb)
+    if core_only:
+        return make_ctr_core(blen, offset)
+
     ctr_file = {
         "notes": note,
         "seed": "0000000000000000",
@@ -179,7 +226,8 @@ def make_ctr_core(blen, offset):
     }
 
 
-def make_hw_config(blen=31, weight=4, offset=None, tv_count=None, offset_range: float = None, min_data=None):
+def make_hw_config(blen=31, weight=4, offset=None, tv_count=None, offset_range: float = None, min_data=None,
+                   core_only=False, return_aux=False):
     """
     Generate HW counter CryptoStreams config with configurable offset.
      - blen is block width in bytes
@@ -216,11 +264,17 @@ def make_hw_config(blen=31, weight=4, offset=None, tv_count=None, offset_range: 
     if min_data is not None and min_data > blen * min(rem_vectors, tv_count) * blen:
         raise ValueError('Condition on minimal data could not be fulfilled')
 
-    note = 'plaintext-hw-%sbit-hw%s-offsetidx-%s-offset-%s-r%.2f-vecsize-%s-%.2fMB' \
+    note = 'hw-%sbit-hw%s-offsetidx-%s-offset-%s-r%.2f-vecsize-%s-%.2fMB' \
            % (blen * 8, weight, offset_idx, '-'.join(map(str, offset)), offset_range, rem_vectors, gen_data_mb)
 
+    core = {
+      "type": "hw_counter",
+      "initial_state": offset,
+      "hw": weight
+    }
+
     hw_file = {
-        "notes": note,
+        "notes": 'plaintext-' + note,
         "seed": "0000000000000000",
         "tv-size": None,
         "tv-count": None,
@@ -228,14 +282,15 @@ def make_hw_config(blen=31, weight=4, offset=None, tv_count=None, offset_range: 
         "tv_count": tv_count,
         "stdout": True,
         "file_name": "hw_ctr.bin",
-        "stream": {
-          "type": "hw_counter",
-          "initial_state": offset,
-          "hw": weight
-        }
+        "stream": core
     }
 
-    return hw_file
+    if return_aux:
+        return HwConfig(script=hw_file, core=core, weight=weight, offset=offset, offset_range=offset_range,
+                        rem_vectors=rem_vectors, gen_data_mb=gen_data_mb, note=note)
+
+    cfg_to_return = core if core_only else hw_file
+    return cfg_to_return
 
 
 def make_hw_core(offset, weight):
@@ -446,19 +501,23 @@ def gen_all(data_sizes=None, eprefix=None):
 
 def get_prime_strategies(moduli, moduli_bits, out_block_bits, max_out_b):
     return [
-        # fit to moduli size
+        # fit to moduli size; 6: rand offset window, rejection sample on moduli.
+        # ob = moduli_bits, spread to 2**moduli_bits, fill whole modulus, does not have to be byte-aligned
         ('s6mb', get_strategy_prime_expdrop6(moduli, ob=moduli_bits, ib=out_block_bits, max_out=max_out_b)),
 
         # fit to moduli size, byte align top
+        # ob = out_block_bits, moduli bits, byte aligned, contains whole modulus
         ('s6ob', get_strategy_prime_expdrop6(moduli, ob=out_block_bits, ib=out_block_bits, max_out=max_out_b)),
 
-        # fit to moduli size
+        # fit to moduli size; 15: spread_inverse_frac, inverse sampling with arbitrary precision
+        # 15: stretch to whole interval by scaling, fill gaps from stretch by uniform number dist, arbitrary prec.
         ('s15mb', get_strategy_prime_expinv15(moduli, ob=moduli_bits, ib=out_block_bits, max_out=max_out_b)),
 
         # fit to moduli size, byte align top
         ('s15ob', get_strategy_prime_expinv15(moduli, ob=out_block_bits, ib=out_block_bits, max_out=max_out_b)),
 
         # one bit smaller than moduli, 2x more data
+        # 16: simple rejection sampling on 2**(moduli_bits - 1), cuts top bit
         ('s16mb1', get_strategy_prime_drop16(moduli, ob=moduli_bits - 1, ib=out_block_bits, max_out=max_out_b))
     ]
 
@@ -605,11 +664,15 @@ def gen_lowmc(data_sizes=None, eprefix=None):
     to_gen = [
         # name, rounds-all, keysize, blocksize, sboxes, rounds to try
         ('lowmc-s80a', (12, ), 80, 256, 49, [3, 4, 5, 6, 7, 8, 9, 10, 11]),
-        ('lowmc-s80a', (12, ), 80, 128, 31, [3, 4, 5, 6, 7, 8, 9, 10, 11]),
+        ('lowmc-s80b', (12, ), 80, 128, 31, [3, 4, 5, 6, 7, 8, 9, 10, 11]),
         ('lowmc-s128a', (14, ), 128, 256, 63, [3, 4, 5, 6, 7, 8, 9, 10, 11]),
         ('lowmc-s128b', (252, ), 128, 128, 1, [3, 4, 5, 6, 7, 8, 9, 10, 11, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240]),
         ('lowmc-s128c', (128, ), 128, 128, 2, [3, 4, 5, 6, 7, 8, 9, 10, 11, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110]),
         ('lowmc-s128d', (88, ), 128, 128, 3, [3, 4, 5, 6, 7, 8, 9, 10, 11, 20, 30, 40, 50, 60, 70, 80]),
+
+        # ('lowmc-s128b', (252, ), 128, 128, 1, [146, 151, 152, 153, 154, 155, 156, 157, 158, 159]),
+        # ('lowmc-s128c', (128, ), 128, 128, 2, [108, 109, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128]),
+        # ('lowmc-s128d', (88, ), 128, 128, 3, [59, 61, 62, 63, 64, 65]),
     ]
 
     data_sizes = data_sizes or [100 * 1024 * 1024]
@@ -636,11 +699,11 @@ def gen_lowmc(data_sizes=None, eprefix=None):
 
         weight = comp_hw_weight(inp_block_bytes, samples=3, min_data=min_data)
         hw_configs = [
-            ('lhw01-b%s-w%s' % (inp_block_bytes, weight),
+            ('lhw00-b%s-w%s' % (inp_block_bytes, weight),
              make_hw_config(inp_block_bytes, weight=weight, offset_range=0.0, min_data=min_data), '0000000000000003'),
-            ('lhw02-b%s-w%s' % (inp_block_bytes, weight),
+            ('lhw01-b%s-w%s' % (inp_block_bytes, weight),
              make_hw_config(inp_block_bytes, weight=weight, offset_range=1/3., min_data=min_data), '0000000000000004'),
-            ('lhw03-b%s-w%s' % (inp_block_bytes, weight),
+            ('lhw02-b%s-w%s' % (inp_block_bytes, weight),
              make_hw_config(inp_block_bytes, weight=weight, offset_range=2/3., min_data=min_data), '0000000000000005'),
         ]
 
@@ -707,25 +770,143 @@ def gen_lowmc(data_sizes=None, eprefix=None):
     return agg_scripts
 
 
-def write_submit(data):
-    name_list = []
+def int_to_hex(input, nbytes=1):
+    return binascii.hexlify(input.to_bytes(nbytes, byteorder='big')).decode('utf8')
 
-    for coff in data:
-        ename = coff[0]
-        esize = int(coff[1])
-        script = coff[2]
 
-        name_tpl = '%s.json' % (ename,)
-        name_list.append((name_tpl, esize))
+def int_to_seed(seed):
+    return int_to_hex(seed, 8)
 
-        with open(name_tpl, 'w+') as fh:
-            fh.write(json.dumps(script, indent=2))
 
+def gen_col_iv(is_block=True):
+    if is_block:
+        return {
+            "type": "false_stream"
+        }
+    else:
+        return {
+            "type": "repeating_stream",
+            "period": 1,
+            "source": {
+                "type": "false_stream"
+            }
+        }
+
+
+def generate_block_col(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix=''):
+    return generate_cfg_col('block', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix)
+
+
+def generate_stream_col(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix=''):
+    return generate_cfg_col('stream_cipher', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix)
+
+
+def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
+                     do_sac=False):
+    """
+    tv_size defines number of bytes to generate using current key value
+    Inspired by taro_proc.py
+    """
+    tv_count = int(math.ceil(data_size / tv_size))
+    key_count = int(math.ceil(data_size / key_size))  # number of keys
+    inp_block_bytes = key_size
+    size_mbs = int(math.ceil(data_size / 1024 / 1024))
+
+    agg_inputs = []
+    is_block = alg_type == 'block'
+    is_stream = alg_type == 'stream_cipher'
+    if not is_block and not is_stream:
+        raise ValueError('Unknown alg type: %s' % (alg_type,))
+
+    # CTR
+    for ix in range(nexps):
+        sscript = make_ctr_config(inp_block_bytes, offset=int_to_hex(ix, 1), tv_count=key_count, core_only=True)  # type: dict
+        agg_inputs.append(
+            StreamRec(stype='ctr', sdesc=f'{key_size * 8}sbit-offset-{ix}', sscript=sscript,
+                      expid=ix, seed=int_to_seed(ix))
+        )
+
+    # LHW
+    weight = comp_hw_weight(inp_block_bytes, samples=nexps, min_samples=key_count)
+    for ix in range(nexps):
+        sscript = make_hw_config(inp_block_bytes, weight=weight, offset_range=ix/float(nexps),
+                                 tv_count=key_count, return_aux=True)  # type: HwConfig
+        agg_inputs.append(
+            StreamRec(stype='hw', sdesc=sscript.note, sscript=sscript.core,
+                      expid=ix, seed=int_to_seed(nexps + ix))
+        )
+
+    # SAC
+    for ix in range(nexps if do_sac else 0):
+        sscript = {'type': 'sac'}
+        agg_inputs.append(
+            StreamRec(stype='sac', sdesc=f'{key_size * 8}sbit-offset-{ix}', sscript=sscript,
+                      expid=ix, seed=int_to_seed(2 * nexps + ix))
+        )
+
+    agg_scripts = []
+    for configs in agg_inputs:
+        src_type = configs.stype
+        inp_name = configs.sdesc
+        key_config = configs.sscript
+        eid = configs.expid
+        seed = configs.seed
+
+        note = f'{eprefix}{algorithm}-t:{alg_type}-r:{cround}-b:{tv_size}-' \
+               f's:{size_mbs}MiB-e:{eid}-i:{src_type}.key-{inp_name}'
+        fname = note.replace(':', '_') + '.json'
+
+        tpl = {
+            "notes": "generated by generator.py",
+            "seed": seed,
+            "tv-size": None,
+            "tv-count": None,
+            "tv_size": tv_size,
+            "tv_count": tv_count,
+            "stdout": True,
+            "file_name": "file.bin",
+            "stream": {
+                "type": alg_type,
+                "algorithm": algorithm,
+                "round": cround,
+                "block_size": tv_size,
+                "plaintext": {
+                    "type": "false_stream"
+                },
+                "key_size": key_size,
+                "key": key_config,
+                "iv_size": iv_size,
+                "iv": gen_col_iv(is_block=is_block)
+            },
+            "note": note
+        }
+
+        if is_stream:
+            tpl['stream']['generator'] = "pcg32"
+        elif is_block:
+            tpl['stream']['init_frequency'] = "1"
+
+        agg_scripts.append(ExpRec(ename=note, ssize=size_mbs, fname=fname, tpl_file=tpl, cfg_type='cryptostreams-config'))
+    return agg_scripts
+
+
+def write_submit(data, cfg_type='rtt-data-gen-config'):
+    ndata = [
+        ExpRec(ename=x[0], ssize=int(x[1]), fname='%s.json' % x[0], tpl_file=x[2], cfg_type=cfg_type) for x in data
+    ]
+    return write_submit_obj(ndata)
+
+
+def write_submit_obj(data: List[ExpRec]):
     with open('__enqueue.sh', 'w+') as fh:
         fh.write("#!/bin/bash\n")
-        for name, esize in name_list:
+
+        for coff in data:
+            with open(coff.fname, 'w+') as fhc:
+                fhc.write(json.dumps(coff.tpl_file, indent=2))
+
             # fh.write("submit_experiment --dieharder --email ph4r05@gmail.com  --name 't06-dieharder-%s' --cfg 'dieharder-paper-1GB.json' --cryptostreams-config '%s'\n" % (name, name))
             fh.write("submit_experiment --all_batteries "
                      "--name '%s' "
                      "--cfg '/home/debian/rtt-home/RTTWebInterface/media/predefined_configurations/%sMB.json' "
-                     "--rtt-data-gen-config '%s'\n" % (name, esize, name))
+                     "--%s '%s'\n" % (coff.ename, coff.ssize, coff.cfg_type, coff.fname))
