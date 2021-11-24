@@ -411,6 +411,34 @@ class Cleaner:
             self.conn.commit()
             logger.info('Experiment %s solved' % (eid,))
 
+    def fix_underscores(self):
+        with self.conn.cursor() as c:
+            logger.info("Processing experiments")
+
+            c.execute("""SELECT id, name, status, created, run_started, run_finished, data_file_sha256, data_file_size, 
+                                 data_file_id FROM experiments 
+                                 WHERE id >= %s
+                              """ % (self.exp_id_low,))
+
+            renames = []
+            for result in c.fetchall():
+                eid, name, status, sha, fsize = result[0], result[1], result[2], result[6], result[7]
+                if re.match(r'.*-t_[\w].*', name):
+                    renames.append((eid, name))
+
+            for eid, name in renames:
+                nname = name
+                nname = nname.replace('_', ':')
+                nname = nname.replace('stream:cipher', 'stream_cipher')
+
+                sql_exps = 'UPDATE experiments SET name=%s WHERE id=%s'
+                print(f'Updating {eid} to {nname}')
+                try_execute(lambda: c.execute(sql_exps, (nname, eid,)),
+                            msg="Update experiment with ID %s" % eid)
+
+            self.conn.commit()
+            logger.info('Experiment %s solved' % (eid,))
+
     def fix_lowmc(self):
         with self.conn.cursor() as c:
             logger.info("Processing experiments")
