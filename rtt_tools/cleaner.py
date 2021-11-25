@@ -466,7 +466,7 @@ class Cleaner:
             self.conn.commit()
             logger.info('Experiment %s solved' % (eid,))
 
-    def comp_new_rounds(self, specs, tmpdir='/tmp/rspecs', smidx=5):
+    def comp_new_rounds(self, specs, tmpdir='/tmp/rspecs', smidx=5, new_size=None, skip_existing_since=None):
         """
         Generates submit_experiment for a new rounds to compute.
         specs is: fname -> meth -> [[exids], [rounds]
@@ -481,8 +481,21 @@ class Cleaner:
                     for cround in rec[1]:
                         eids_map[cexid].add(cround)
 
+        existing_exps = {}
         file_names = []
         with self.conn.cursor() as c:
+            if skip_existing_since is not None:
+                logger.info("Loading exp name database to skip existing")
+                sql_sel = """SELECT e.id, name FROM experiments e
+                             WHERE e.id >= %s
+                          """ % (skip_existing_since,)
+                c.execute(sql_sel)
+                for result in c.fetchall():
+                    name = result[1]
+                    nname_find = re.sub(r'^PH4-SM-([\d]+)-', '', name)
+                    existing_exps[nname_find] = result[0]
+                logger.info('Loaded database of %s expnames; %s' % (len(existing_exps), sql_sel, ))
+
             logger.info("Generating new round specs, eids: %s" % (', '.join(map(str, list(eids_map.keys())))))
             sql_sel = """SELECT e.id, name, dp.`provider_config`, dp.provider_name, dp.id, dp.provider_config_name
                             FROM experiments e
@@ -505,9 +518,21 @@ class Cleaner:
                         config_js['note'] = nname
 
                         ssize = '100' if ('-s:100MiB-' in name or '-s:100MB' in name) else '10'
+                        if new_size:
+                            nname = re.sub(r'-s:([\d]+)MiB-', '-s:%sMiB-' % (int(new_size / 1024 / 1024)), nname)
+                            config_js['tv_count'] = int(math.ceil(new_size / config_js['tv_size']))
+                            ssize = str(int(new_size / 1024 / 1024))
+
                         ptype = '--cryptostreams-config'
                         fname = nname.replace(':', '_').replace('.json', '') + '.json'
-                        logger.info('  Eid %s -> r=%s, name=%s, fname=%s' % (eid, cround, nname, fname))
+                        nname_find = re.sub(r'^PH4-SM-([\d]+)-', '', nname)
+                        if nname_find in existing_exps:
+                            logger.info('  Eid %s -> r=%s, name=%s, fname=%s, nsize=%s SKIP'
+                                        % (eid, cround, nname, fname, new_size))
+                            continue
+
+                        logger.info('  Eid %s -> r=%s, name=%s, fname=%s, nsize=%s'
+                                    % (eid, cround, nname, fname, new_size))
 
                         file_names.append((nname, fname, ssize, ptype))
                         with open(os.path.join(tmpdir, fname), 'w+') as fh:
