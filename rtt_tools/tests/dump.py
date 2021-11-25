@@ -25,6 +25,10 @@ class RttDumpTest(unittest.TestCase):
         self.assertEqual(r.fnc, 'F-FCSR')
         self.assertEqual(r.osize, 104857600)
 
+        r = l.break_exp_ph4('PH4-SM-07-AES-t:block-r:5-b:16-s:100MiB-e:0-i:ctr.key-128sbit-offset-0')
+        self.assertEqual(r.fnc, 'AES')
+        self.assertEqual(r.osize, 104857600)
+
     def test_mpc(self):
         l = Loader()
         r1 = l.break_exp_ph4_mpc('testmpc02-lowmc-s128b-bin-raw-r6-inp-ctr00-b16-spr--s100MB.json')

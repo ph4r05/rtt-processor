@@ -909,7 +909,7 @@ class Loader:
         return ei
 
     def break_exp_ph4(self, s):
-        m = re.match(r'^PH4-SM-[\d]+-([\w-]+?)-t:([\w]+?)-r:([\w]+?)-b:([\w]+?)-s:([\w]+?)-e:([\w]+?)-i:([\w]+)-(.+?)?$', s)
+        m = re.match(r'^PH4-SM-[\d]+-([\w-]+?)-t:([\w]+?)-r:([\w]+?)-b:([\w]+?)-s:([\w]+?)-e:([\w]+?)-i:([\w]+(:?\.key)?)-(.+?)?$', s)
         if m is None:
             return ExpInfo()
 
