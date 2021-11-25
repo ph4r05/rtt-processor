@@ -191,9 +191,9 @@ rr += g.generate_stream_col('F-FCSR', 1000*1024*1024, 5, 16, 16, 8, eprefix='PH4
 rr += g.generate_stream_col('Fubuki', 1000*1024*1024, 1, 16, 16, 16, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
 rr += g.generate_stream_col('Fubuki', 1000*1024*1024, 2, 16, 16, 16, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
 
+rr += g.generate_stream_col('Grain', 1000*1024*1024, 4, 16, 16, 12, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
 rr += g.generate_stream_col('Grain', 1000*1024*1024, 5, 16, 16, 12, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
 rr += g.generate_stream_col('Grain', 1000*1024*1024, 6, 16, 16, 12, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
-rr += g.generate_stream_col('Grain', 100*1024*1024, 4, 16, 16, 12, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
 
 rr += g.generate_stream_col('HC-128', 1000*1024*1024, 1, 16, 16, 16, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
 
