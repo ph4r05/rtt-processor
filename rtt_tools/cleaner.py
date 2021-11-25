@@ -2,6 +2,7 @@
 # @author: Dusan Klinec (ph4r05)
 # pandas matplotlib numpy networkx graphviz scipy dill configparser coloredlogs mysqlclient requests sarge cryptography paramiko shellescape
 import os
+import shutil
 
 from rtt_tools.common.rtt_db_conn import *
 import configparser
@@ -15,6 +16,7 @@ import json
 import argparse
 from typing import Optional, List, Dict, Tuple, Union, Any, Sequence, Iterable, Collection
 
+from rtt_tools.utils import natural_sort_key
 
 logger = logging.getLogger(__name__)
 coloredlogs.CHROOT_FILES = []
@@ -466,6 +468,52 @@ class Cleaner:
             self.conn.commit()
             logger.info('Experiment %s solved' % (eid,))
 
+    def dump_experiment_configs(self, from_id: int, tmpdir='/tmp/rspecs', matcher=None, clean_before=False):
+        """
+        Loads all experiment configuration files and dumps them as jsons to the file system.
+        Used by analysis scripts to resubmit work.
+        """
+        if clean_before:
+            shutil.rmtree(tmpdir)
+
+        os.makedirs(tmpdir, exist_ok=True)
+        expfiles = set()
+        with self.conn.cursor() as c:
+            logger.info("Loading experiment input configs: %s" % (from_id,))
+            sql_sel = """SELECT e.id, name, dp.`provider_config`, dp.provider_name, dp.id, dp.provider_config_name
+                            FROM experiments e
+                            JOIN rtt_data_providers dp ON e.data_file_id = dp.id
+                            WHERE e.id >= %s
+                              """ % (from_id,)
+            logger.info('SQL: %s' % sql_sel)
+            c.execute(sql_sel)
+
+            for result in c.fetchall():
+                eid, name, config, pname = result[0], result[1], result[2], result[3]
+                if matcher and not matcher((eid, name, config, pname)):
+                    continue
+
+                js = json.loads(config)
+                if 'note' in js:
+                    js['note'] = name
+                    config = json.dumps(js, indent=2)
+
+                elif 'input_files' in js and 'stream' in js and 'exec' in js['stream']:
+                    js['stream']['note'] = name
+                    config = json.dumps(js, indent=2)
+
+                fname = name.replace(':', '_').replace('.json', '') + '.json'
+                fpath = os.path.join(tmpdir, fname)
+                with open(fpath, 'w+') as fh:
+                    fh.write(config)
+
+                expfiles.add(fname)
+
+        with open(os.path.join(tmpdir, '__expfiles.json'), 'w+') as fh:
+            js = list(expfiles)
+            js.sort(key=natural_sort_key)
+            json.dump(js, fh)
+
     def comp_new_rounds(self, specs, tmpdir='/tmp/rspecs', smidx=5, new_size=None, skip_existing_since=None):
         """
         Generates submit_experiment for a new rounds to compute.
@@ -540,6 +588,7 @@ class Cleaner:
 
                 elif pname == 'rtt-data-gen':
                     logger.info('RTT data gen for %s' % (name, ))
+                    # TODO: add support here, just for rounds change
                     continue
 
                 else:
