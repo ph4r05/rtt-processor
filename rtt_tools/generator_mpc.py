@@ -88,6 +88,39 @@ class HwConfig:
         self.note = note
 
 
+class StreamOptions:
+    ZERO = 1
+    CTR = 2
+    LHW = 4
+    SAC = 8
+    RND = 16
+
+    CTR_LHW = CTR | LHW
+    CTR_LHW_SAC = CTR_LHW | SAC
+    CTR_LHW_SAC_RND = CTR_LHW_SAC | RND
+    SAC_RND = SAC | RND
+
+    @staticmethod
+    def has_zero(x):
+        return (x & StreamOptions.ZERO) > 0
+
+    @staticmethod
+    def has_ctr(x):
+        return (x & StreamOptions.CTR) > 0
+
+    @staticmethod
+    def has_lhw(x):
+        return (x & StreamOptions.LHW) > 0
+
+    @staticmethod
+    def has_sac(x):
+        return (x & StreamOptions.SAC) > 0
+
+    @staticmethod
+    def has_rnd(x):
+        return (x & StreamOptions.RND) > 0
+
+
 @lru_cache(maxsize=1024)
 def comb(n, k, exact=False):
     return scipy_comb(n, k, exact=exact)
@@ -793,20 +826,25 @@ def gen_col_iv(is_block=True):
         }
 
 
-def generate_block_col(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix=''):
-    return generate_cfg_col('block', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix)
+def generate_block_col(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
+                       streams=StreamOptions.CTR_LHW):
+    return generate_cfg_col('block', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix, streams)
 
 
-def generate_stream_col(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix=''):
-    return generate_cfg_col('stream_cipher', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix)
+def generate_stream_col(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
+                        streams=StreamOptions.CTR_LHW):
+    return generate_cfg_col('stream_cipher', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix,
+                            streams)
 
 
-def generate_prng_col(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix=''):
-    return generate_cfg_col('prng', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix)
+def generate_prng_col(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
+                      streams=StreamOptions.CTR_LHW):
+    return generate_cfg_col('prng', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix,
+                            streams)
 
 
 def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
-                     do_sac=False):
+                     streams=StreamOptions.CTR_LHW):
     """
     tv_size defines number of bytes to generate using current key value
     Inspired by taro_proc.py
@@ -824,7 +862,7 @@ def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=16, key_s
         raise ValueError('Unknown alg type: %s' % (alg_type,))
 
     # CTR
-    for ix in range(nexps):
+    for ix in range(nexps if StreamOptions.has_ctr(streams) else 0):
         sscript = make_ctr_config(inp_block_bytes, offset=int_to_hex(ix, 1), tv_count=key_count, core_only=True)  # type: dict
         agg_inputs.append(
             StreamRec(stype='ctr', sdesc=f'{key_size * 8}sbit-offset-{ix}', sscript=sscript,
@@ -833,7 +871,7 @@ def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=16, key_s
 
     # LHW
     weight = comp_hw_weight(inp_block_bytes, samples=nexps, min_samples=key_count)
-    for ix in range(nexps):
+    for ix in range(nexps if StreamOptions.has_lhw(streams) else 0):
         sscript = make_hw_config(inp_block_bytes, weight=weight, offset_range=ix/float(nexps),
                                  tv_count=key_count, return_aux=True)  # type: HwConfig
         agg_inputs.append(
@@ -842,11 +880,19 @@ def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=16, key_s
         )
 
     # SAC
-    for ix in range(nexps if do_sac else 0):
+    for ix in range(nexps if StreamOptions.has_sac(streams) else 0):
         sscript = {'type': 'sac'}
         agg_inputs.append(
             StreamRec(stype='sac', sdesc=f'{key_size * 8}sbit-offset-{ix}', sscript=sscript,
                       expid=ix, seed=int_to_seed(2 * nexps + ix))
+        )
+
+    # RND
+    for ix in range(nexps if StreamOptions.has_rnd(streams) else 0):
+        sscript = {'type': 'pcg32_stream'}
+        agg_inputs.append(
+            StreamRec(stype='rnd', sdesc=f'{key_size * 8}sbit-offset-{ix}', sscript=sscript,
+                      expid=ix, seed=int_to_seed(3 * nexps + ix))
         )
 
     agg_scripts = []
