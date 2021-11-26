@@ -205,6 +205,8 @@ rr += g.generate_stream_col('LEX', 1000*1024*1024, 4, 16, 16, 16, eprefix='PH4-S
 
 rr += g.generate_stream_col('Rabbit', 1000*1024*1024, 1, 16, 16, 8, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
 
+rr += g.generate_stream_col('RC4', 1000*1024*1024, 1, 32, 16, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
+
 rr += g.generate_stream_col('Salsa20', 1000*1024*1024, 3, 8, 16, 8, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
 rr += g.generate_stream_col('Salsa20', 1000*1024*1024, 4, 8, 16, 8, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
 
@@ -219,3 +221,54 @@ rr += g.generate_stream_col('TSC-4', 1000*1024*1024, 15, 32, 10, 10, eprefix='PH
 
 g.write_submit_obj(rr)
 ```
+
+# Fixing redundant 1GB stream ciphers
+
+```python
+import os, shutil
+from rtt_tools import generator_mpc as g
+dname = '/tmp/ggen13'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]
+rr += g.generate_stream_col('DECIM', 1000*1024*1024, 6, 24, 10, 8, eprefix='PH4-SM-07-', streams=g.StreamOptions.LHW)
+rr += g.generate_stream_col('DECIM', 1000*1024*1024, 7, 24, 10, 8, eprefix='PH4-SM-07-', streams=g.StreamOptions.LHW)
+
+rr += g.generate_stream_col('Hermes', 1000*1024*1024, 1, 16, 10, 0, eprefix='PH4-SM-07-', streams=g.StreamOptions.LHW)
+rr += g.generate_stream_col('Hermes', 1000*1024*1024, 2, 16, 10, 0, eprefix='PH4-SM-07-', streams=g.StreamOptions.LHW)
+rr += g.generate_stream_col('Hermes', 1000*1024*1024, 3, 16, 10, 0, eprefix='PH4-SM-07-', streams=g.StreamOptions.LHW)
+
+rr += g.generate_stream_col('Salsa20', 1000*1024*1024, 3, 8, 16, 8, eprefix='PH4-SM-07-', streams=g.StreamOptions.LHW)
+rr += g.generate_stream_col('Salsa20', 1000*1024*1024, 4, 8, 16, 8, eprefix='PH4-SM-07-', streams=g.StreamOptions.LHW)
+
+rr += g.generate_stream_col('TSC-4', 1000*1024*1024, 14, 32, 10, 10, eprefix='PH4-SM-07-', streams=g.StreamOptions.LHW)
+rr += g.generate_stream_col('TSC-4', 1000*1024*1024, 15, 32, 10, 10, eprefix='PH4-SM-07-', streams=g.StreamOptions.LHW)
+
+g.write_submit_obj(rr)
+```
+
+# Redundant for 100MB
+```python
+import os, shutil
+from rtt_tools import generator_mpc as g
+dname = '/tmp/ggen15'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]
+rr += g.generate_stream_col('RC4', 100*1024*1024, 1, 32, 16, eprefix='PH4-SM-07-', streams=g.StreamOptions.LHW)
+
+rr += g.generate_stream_col('DECIM', 100*1024*1024, 6, 24, 10, 8, eprefix='PH4-SM-07-', streams=g.StreamOptions.LHW)
+rr += g.generate_stream_col('DECIM', 100*1024*1024, 7, 24, 10, 8, eprefix='PH4-SM-07-', streams=g.StreamOptions.LHW)
+rr += g.generate_stream_col('DECIM', 100*1024*1024, 8, 24, 10, 8, eprefix='PH4-SM-07-', streams=g.StreamOptions.LHW)
+
+rr += g.generate_stream_col('Hermes', 100*1024*1024, 1, 16, 10, 0, eprefix='PH4-SM-07-', streams=g.StreamOptions.LHW)
+rr += g.generate_stream_col('Hermes', 100*1024*1024, 2, 16, 10, 0, eprefix='PH4-SM-07-', streams=g.StreamOptions.LHW)
+rr += g.generate_stream_col('Hermes', 100*1024*1024, 3, 16, 10, 0, eprefix='PH4-SM-07-', streams=g.StreamOptions.LHW)
+
+rr += g.generate_stream_col('TSC-4', 100*1024*1024, 14, 32, 10, 10, eprefix='PH4-SM-07-', streams=g.StreamOptions.LHW)
+rr += g.generate_stream_col('TSC-4', 100*1024*1024, 15, 32, 10, 10, eprefix='PH4-SM-07-', streams=g.StreamOptions.LHW)
+rr += g.generate_stream_col('TSC-4', 100*1024*1024, 16, 32, 10, 10, eprefix='PH4-SM-07-', streams=g.StreamOptions.LHW)
+
+g.write_submit_obj(rr)
+```
+

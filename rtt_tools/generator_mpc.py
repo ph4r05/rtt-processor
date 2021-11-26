@@ -46,6 +46,16 @@ MODULI = {
     'Bin255': 2**255,
 }
 
+# Input lengths for PRNGs
+ILENS = {
+    'std_mersenne_twister': 4,
+    'std_lcg': 4,
+    'std_subtract_with_carry': 4,
+    'testu01-ulcg': 6,  # estimate, precise number is computed from constants
+    'testu01-umrg': 6,  # estimate, precise number is computed from constants
+    'testu01-uxorshift': 8 * 4,
+}
+
 
 class ExpRec:
     def __init__(self, ename, ssize, fname, tpl_file, cfg_type=None):
@@ -185,6 +195,27 @@ def unrank(i, n, k):
     return c
 
 
+def get_input_key(alg_type):
+    """Returns cstreams algorithm input js config key"""
+    if alg_type == 'hash':
+        return 'source'
+    elif alg_type == 'prng':
+        return 'seeder'  # for PRNGs we feed seeder / key
+    else:
+        return 'plaintext'
+
+
+def get_input_size(config):
+    """Returns input block size for the cstreams config"""
+    alg_type = config['stream']['type']
+    if alg_type == 'hash':
+        return config['stream']['input_size']
+    elif alg_type == 'prng':
+        return ILENS[config['stream']['algorithm']]
+    else:
+        return config['stream']['block_size']
+
+
 def make_ctr_config(blen=31, offset='00', tv_count=None, min_data=None, core_only=False) -> dict:
     """
     Generate counter CryptoStreams config with configurable offset.
@@ -226,9 +257,11 @@ def make_ctr_config(blen=31, offset='00', tv_count=None, min_data=None, core_onl
     return ctr_file
 
 
-def make_ctr_core(blen, offset):
+def make_ctr_core(blen, offset='00'):
     return {
         "type": "xor_stream",
+        "note": "ctr-offset",
+        "ctr_offset": int(offset, 16),
         "source": {
             "type": "tuple_stream",
             "sources": [
@@ -303,7 +336,8 @@ def make_hw_config(blen=31, weight=4, offset=None, tv_count=None, offset_range: 
     core = {
       "type": "hw_counter",
       "initial_state": offset,
-      "hw": weight
+      "hw": weight,
+      "offset_ratio": offset_range,
     }
 
     hw_file = {
@@ -396,6 +430,11 @@ def get_smaller_byteblock(bits):
     return bits // 8
 
 
+class HwSpaceTooSmall(ValueError):
+    def __init__(self, *args, **kwargs):
+        super(HwSpaceTooSmall, self).__init__(*args, **kwargs)
+
+
 def comp_hw_weight(blen, samples=3, min_data=None, min_samples=None):
     for hw in range(3, blen*8 // 2):
         max_combs = comb_cached(blen*8, hw)
@@ -409,7 +448,7 @@ def comp_hw_weight(blen, samples=3, min_data=None, min_samples=None):
 
         return hw
 
-    raise ValueError('Could not find suitable HW')
+    raise HwSpaceTooSmall('Could not find suitable HW')
 
 
 def log2ceil(x):
@@ -620,7 +659,7 @@ def gen_script_config(to_gen, is_prime=True, data_sizes=None, eprefix=None):
         cpos = ccfg[0]
         max_out = ccfg[1]
         sfile = cpos[3]
-        rrounds = cpos[2]
+        rrounds = cpos[2]  # full rounds specs
 
         moduli = MODULI[cpos[1]]
         moduli_bits = log2ceil(moduli)
@@ -850,7 +889,7 @@ def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=16, key_s
     Inspired by taro_proc.py
     """
     tv_count = int(math.ceil(data_size / tv_size))
-    key_count = int(math.ceil(data_size / key_size))  # number of keys
+    key_count = tv_count  # number of keys = number of test vectors. Reseed with each TV
     inp_block_bytes = key_size
     size_mbs = int(math.ceil(data_size / 1024 / 1024))
 
