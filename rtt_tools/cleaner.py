@@ -16,6 +16,8 @@ import json
 import argparse
 from typing import Optional, List, Dict, Tuple, Union, Any, Sequence, Iterable, Collection
 
+from rtt_tools.generator_mpc import get_input_key, get_input_size, comp_hw_weight, make_hw_config, HwConfig, \
+    comb_cached, rank, HwSpaceTooSmall
 from rtt_tools.utils import natural_sort_key
 
 logger = logging.getLogger(__name__)
@@ -468,12 +470,105 @@ class Cleaner:
             self.conn.commit()
             logger.info('Experiment %s solved' % (eid,))
 
+    def fix_1000MB(self, from_id=None, exp_count=3):
+        with self.conn.cursor() as c:
+            bad_hws = []
+            redundant_hws = []
+
+            logger.info("Processing experiments")
+            sql_sel = """SELECT e.id, name, dp.`provider_config`, dp.provider_name, dp.id, dp.provider_config_name
+                                        FROM experiments e
+                                        JOIN rtt_data_providers dp ON e.data_file_id = dp.id
+                                        WHERE e.id > %s 
+                                        AND name LIKE 'PH4-SM%%'
+                                        AND name LIKE '%%-i:hw%%'
+                      """ % (from_id,)
+            logger.info('SQL: %s' % sql_sel)
+            c.execute(sql_sel)
+
+            for result in c.fetchall():
+                eid, name, config, pname = result[0], result[1], result[2], result[3]
+                config_js = json.loads(config)
+
+                alg_type = config_js['stream']['type']
+                if '-i:hw.key-' in name:
+                    inpkey = 'key'
+                    isize = config_js['stream']['key_size']
+
+                else:
+                    inpkey = get_input_key(alg_type)
+                    isize = get_input_size(config_js)
+
+                new_size = config_js['tv_count'] * config_js['tv_size']
+                cur_hw = config_js['stream'][inpkey]
+                tv_count = config_js['tv_count']
+                m1 = re.match(r'.*-e:([\d]+)-.*', name)
+                lhw_offset_ratio = 0
+                eidx = 0
+                if m1:
+                    eidx = int(m1.group(1))
+                    lhw_offset_ratio = eidx / exp_count
+                else:
+                    logger.info(f'Could not detect current HW offset ratio, using 0')
+
+                data_size_in = int(math.ceil((new_size / tv_count) * isize))
+                try:
+                    weight_comp = comp_hw_weight(isize, exp_count, min_samples=tv_count)
+                except:
+                    logger.info(f'! HW not possible for {eid} {name}, tv_count={tv_count}, isize: {isize}')
+                    continue
+
+                # Check current config, if the HW setting is OK enough, no need to discard.
+                # Criteria: HW spaces do not overlap. Assuming equal spacing,
+                # remaining vectors >= tv_count * remaining offsets. We cannot check offset 0 easily.
+                cur_num_vectors = comb_cached(isize * 8, cur_hw['hw'])
+                offset_idx = rank(cur_hw['initial_state'], isize * 8)
+                rem_vectors = cur_num_vectors - offset_idx
+                num_space_to_cover = tv_count * (exp_count - 1 - eidx)
+
+                if cur_hw['hw'] == weight_comp and rem_vectors >= num_space_to_cover:
+                    # logger.info(f'HW config is OK for {name} [1]')
+                    continue
+
+                if cur_hw['hw'] >= weight_comp and rem_vectors >= num_space_to_cover:
+                    logger.info(f'HW config is OK but redundant for {name} [1], usedhw {cur_hw["hw"]} vs comp {weight_comp}, isize {isize}')
+                    redundant_hws.append((eid, name))
+                    continue
+
+                try:
+                    hw_cfg = make_hw_config(isize, weight=weight_comp, offset_range=lhw_offset_ratio,
+                                            min_data=data_size_in, return_aux=True)  # type: HwConfig
+
+                    if weight_comp == cur_hw['hw'] and hw_cfg.core['initial_state'] == cur_hw['initial_state']:
+                        logger.info(f'HW config is OK for {name} [2]')
+                        continue
+
+                    logger.info(f'!HW config not enough for {name}, new config: {hw_cfg.note}, {hw_cfg.gen_data_mb} {hw_cfg.rem_vectors}')
+                    bad_hws.append((eid, name))
+                    continue
+
+                except Exception as e:
+                    logger.error(f"Exception in hw gen {e}, alg: {name}, "
+                                 f"wcomp: {weight_comp}, tv-count: {tv_count}, ilen: {isize}, "
+                                 f"dsizeInp: {data_size_in}", exc_info=e)
+                    raise
+
+            logger.info('Redundant HWs: %s' % (', '.join([str(x[0]) for x in redundant_hws])))
+            for eid, name in redundant_hws:
+                logger.info(f'  {eid} {name}')
+
+            logger.info('Invalid HWs: %s' % (', '.join([str(x[0]) for x in bad_hws])))
+            for eid, name in bad_hws:
+                logger.info(f'  {eid} {name}')
+
+            logger.info('Finished')
+
     def dump_experiment_configs(self, from_id: int, tmpdir='/tmp/rspecs', matcher=None, clean_before=False):
         """
         Loads all experiment configuration files and dumps them as jsons to the file system.
         Used by analysis scripts to resubmit work.
         """
-        if clean_before:
+        if clean_before and os.path.exists(tmpdir):
             shutil.rmtree(tmpdir)
 
         os.makedirs(tmpdir, exist_ok=True)
@@ -519,7 +614,7 @@ class Cleaner:
         Generates submit_experiment for a new rounds to compute.
         specs is: fname -> meth -> [[exids], [rounds]
         """
-        if clean_before:
+        if clean_before and os.path.exists(tmpdir):
             shutil.rmtree(tmpdir)
 
         os.makedirs(tmpdir, exist_ok=True)
@@ -563,8 +658,12 @@ class Cleaner:
 
                 if pname == 'cryptostreams':
                     for cround in sorted(list(eids_map[eid])):
-                        nname, ssize = Cleaner.change_cstreams(config_js=config_js, cround=cround,
-                                                               name=name, smidx=smidx, new_size=new_size)
+                        try:
+                            nname, ssize = Cleaner.change_cstreams(config_js=config_js, cround=cround,
+                                                                   name=name, smidx=smidx, new_size=new_size)
+                        except HwSpaceTooSmall as e:
+                            logger.warning(f'HW space too small for {eid} {name}')
+                            continue
 
                         ptype = '--cryptostreams-config'
                         fname = nname.replace(':', '_').replace('.json', '') + '.json'
@@ -613,8 +712,12 @@ class Cleaner:
                     dfile = config_js['input_files']['CONFIG1.JSON']['data']
 
                     # Works for lowmc, functions generated by python have -r rnd in `exec`
-                    _, ssize = Cleaner.change_cstreams(config_js=dfile, cround=cround,
-                                                       name=name, smidx=smidx, new_size=new_size)
+                    try:
+                        _, ssize = Cleaner.change_cstreams(config_js=dfile, cround=cround,
+                                                           name=name, smidx=smidx, new_size=new_size)
+                    except HwSpaceTooSmall as e:
+                        logger.warning(f'HW space too small for {eid} {name}')
+                        continue
 
                     # Adapt round and size in the exp name
                     # Name example: testmpc06-lowmc-s128d-bin-raw-r65-inp-lhw02-b16-w5-spr--s100MB.json
@@ -652,7 +755,7 @@ class Cleaner:
                 fh.write(f"submit_experiment --all_batteries --name '{nname}' --cfg '/home/debian/rtt-home/RTTWebInterface/media/predefined_configurations/{ssize}MB.json' {ptype} '{fname}'\n")
 
     @staticmethod
-    def change_cstreams(config_js, cround, name, smidx, new_size=None):
+    def change_cstreams(config_js, cround, name, smidx, new_size=None, exp_count=3):
         config_js['stream']['round'] = cround
         nname = re.sub(r'-r:([\d]+)-', '-r:%s-' % cround, name)
         nname = re.sub(r'^PH4-SM-([\d]+)-', 'PH4-SM-%02d-' % smidx, nname)
@@ -660,10 +763,45 @@ class Cleaner:
         ssize = '100' if ('-s:100MiB-' in name or '-s:100MB' in name) else '10'
         if new_size:
             nname = re.sub(r'-s:([\d]+)Mi?B\b', '-s:%sMiB' % (int(new_size / 1024 / 1024)), nname)
-            config_js['tv_count'] = int(math.ceil(new_size / config_js['tv_size']))
+            tv_count = config_js['tv_count'] = int(math.ceil(new_size / config_js['tv_size']))
             ssize = str(int(new_size / 1024 / 1024))
 
-            # TODO: does not work for LHW - we need to recompute weight and space partitioning to cover whole interval
+            # LHW counter needs reoffsetting as the only input here
+            alg_type = config_js['stream']['type']
+            if '-i:hw.key-' in name:
+                logger.info('Adjusting input HW for a key input')
+                inpkey = 'key'
+                isize = config_js['stream']['key_size']
+
+            else:
+                logger.info('Adjusting input HW for input')
+                inpkey = get_input_key(alg_type)
+                isize = get_input_size(config_js)
+
+            cur_hw = config_js['stream'][inpkey]
+            lhw_offset_ratio = cur_hw['offset_ratio'] if 'offset_ratio' in cur_hw else 0.0
+
+            m1 = re.match(r'.*-e:([\d]+)-.*', name)
+            m2 = re.match(r'-lhw([\d]+)-', name)
+            if m1:
+                lhw_offset_ratio = int(m1.group(1)) / exp_count
+            elif m2:
+                lhw_offset_ratio = int(m2.group(1)) / exp_count
+            else:
+                logger.info(f'Could not detect current HW offset ratio, using 0')
+
+            data_size_in = int(math.ceil((new_size / tv_count) * isize))
+            weight_comp = comp_hw_weight(isize, exp_count, min_samples=tv_count)
+            try:
+                hw_cfg = make_hw_config(isize, weight=weight_comp, offset_range=lhw_offset_ratio, min_data=data_size_in, return_aux=True)  # type: HwConfig
+                config_js['stream'][inpkey] = hw_cfg.core
+                nname = re.sub(r'(-i_hw(:?.key)?)-.*', f'\\1-{hw_cfg.note}', nname)
+
+            except Exception as e:
+                logger.error(f"Exception in hw gen {e}, alg: {name}, "
+                             f"wcomp: {weight_comp}, tv-count: {tv_count}, ilen: {isize}, "
+                             f"dsizeInp: {data_size_in}", exc_info=e)
+                raise
 
         config_js['note'] = nname
         return nname, ssize
