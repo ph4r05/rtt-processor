@@ -272,3 +272,83 @@ rr += g.generate_stream_col('TSC-4', 100*1024*1024, 16, 32, 10, 10, eprefix='PH4
 g.write_submit_obj(rr)
 ```
 
+# RC4
+```python
+import os, shutil
+from rtt_tools import generator_mpc as g
+dname = '/tmp/ggen19'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]
+rr += g.generate_stream_col('RC4', 100*1024*1024, 1, 32, 16, eprefix='PH4-SM-07-', streams=g.StreamOptions.SAC_RND)
+g.write_submit_obj(rr)
+```
+
+# Next new rounds
+```python
+import os, shutil
+from rtt_tools import generator_mpc as g
+dname = '/tmp/ggen20'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]
+rr += g.generate_stream_col('RC4', 100*1024*1024, 1, 32, 16, eprefix='PH4-SM-07-', streams=g.StreamOptions.LHW)
+
+rr += g.generate_stream_col('Grain', 100*1024*1024, 8, 16, 16, 12, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
+rr += g.generate_stream_col('Grain', 100*1024*1024, 9, 16, 16, 12, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
+rr += g.generate_stream_col('Grain', 100*1024*1024, 10, 16, 16, 12, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
+rr += g.generate_stream_col('Grain', 100*1024*1024, 11, 16, 16, 12, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
+rr += g.generate_stream_col('Grain', 100*1024*1024, 12, 16, 16, 12, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
+rr += g.generate_stream_col('Grain', 1000*1024*1024, 7, 16, 16, 12, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
+
+rr += g.generate_stream_col('SOSEMANUK', 100*1024*1024, 10, 16, 16, 16, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
+rr += g.generate_stream_col('SOSEMANUK', 100*1024*1024, 11, 16, 16, 16, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
+rr += g.generate_stream_col('SOSEMANUK', 100*1024*1024, 12, 16, 16, 16, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
+rr += g.generate_stream_col('SOSEMANUK', 1000*1024*1024, 9, 16, 16, 16, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
+
+g.write_submit_obj(rr)
+```
+
+# LowMC manual
+
+```python
+import os, shutil
+from rtt_tools import generator_mpc as g
+dname = '/tmp/ggen21'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]
+
+to_gen = [
+    ('lowmc-s128b', (252, ), [12, 13, 14, 15, 16]),
+    ('lowmc-s128c', (128, ), [12, 13, 14, 15, 16]),
+    ('lowmc-s128d', (88, ), [12, 13, 14, 15, 16, 51, 52, 53, 147, 148, 149]),
+]
+
+rr += g.gen_lowmc_core(to_gen, [10 * 1024 * 1024, 100 * 1024 * 1024], eprefix='testmpc21-')
+g.write_submit_obj(rr)
+```
+
+# LowMC manual missing
+
+```python
+import os, shutil
+from rtt_tools import generator_mpc as g
+dname = '/tmp/ggen22'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]
+
+to_gen = [
+    ('lowmc-s80a', (None, ), [1, 2, 5]),
+    ('lowmc-s80b', (None, ), [1, 2, 5]),
+    ('lowmc-s128a', (None, ), [1, 2, 5]),
+    ('lowmc-s128b', (None, ), [1, 2, 5]),
+    ('lowmc-s128c', (None, ), [1, 2, 5]),
+    ('lowmc-s128d', (None, ), [1, 2, 5]),
+]
+
+rr += g.gen_lowmc_core(to_gen, [10 * 1024 * 1024, 100 * 1024 * 1024], eprefix='testmpc22-')
+g.write_submit_obj(rr)
+```
+

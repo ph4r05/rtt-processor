@@ -57,6 +57,80 @@ ILENS = {
 }
 
 
+class LowmcParams:
+    def __init__(self, name, key_size, block_size, sboxes, full_rounds):
+        self.name = name
+        self.key_size = key_size
+        self.block_size = block_size
+        self.sboxes = sboxes
+        self.full_rounds = full_rounds
+
+
+LOWMC_PARAMS = {
+    'lowmc-s80a': LowmcParams('lowmc-s80a', 80, 256, 49, full_rounds=12),
+    'lowmc-s80b': LowmcParams('lowmc-s80b', 80, 128, 31, full_rounds=12),
+    'lowmc-s128a': LowmcParams('lowmc-s128a', 128, 256, 63, full_rounds=14),
+    'lowmc-s128b': LowmcParams('lowmc-s128b', 128, 128, 1, full_rounds=252),
+    'lowmc-s128c': LowmcParams('lowmc-s128c', 128, 128, 2, full_rounds=128),
+    'lowmc-s128d': LowmcParams('lowmc-s128d', 128, 128, 3, full_rounds=88),
+}  # type: dict[str, LowmcParams]
+
+
+class MpcSageParams:
+    def __init__(self, name, field, full_rounds, script_name, round_tpl='-r %s'):
+        self.name = name
+        self.field = field
+        self.full_rounds = full_rounds
+        self.script = script_name
+        self.round_tpl = round_tpl
+
+
+_ROUND_TPL_PS = '--rf 2 --rp 0 --red-rf1 %s --red-rf2 %s --red-rp %s'
+MPC_SAGE_PARAMS = {
+    'Poseidon_S80b': MpcSageParams('Poseidon_S80b', 'F161', (8, 50), 'starkad_poseidon.sage', _ROUND_TPL_PS),
+    'Poseidon_S128a': MpcSageParams('Poseidon_S128a', 'F125', (8, 81), 'starkad_poseidon.sage', _ROUND_TPL_PS),
+    'Poseidon_S128b': MpcSageParams('Poseidon_S128b', 'F253', (8, 83), 'starkad_poseidon.sage', _ROUND_TPL_PS),
+    'Poseidon_S128c': MpcSageParams('Poseidon_S128c', 'F125', (8, 83), 'starkad_poseidon.sage', _ROUND_TPL_PS),
+    'Poseidon_S128d': MpcSageParams('Poseidon_S128d', 'F61', (8, 40), 'starkad_poseidon.sage', _ROUND_TPL_PS),
+    'Poseidon_S128e': MpcSageParams('Poseidon_S128e', 'F253', (8, 85), 'starkad_poseidon.sage', _ROUND_TPL_PS),
+    'Poseidon_S128_BLS12_138': MpcSageParams('Poseidon_S128_BLS12_138', 'F_QBLS12_381', (8, 60), 'starkad_poseidon.sage', _ROUND_TPL_PS),
+
+    'Starkad_S80b': MpcSageParams('Starkad_S80b', 'Bin161', (8, 52), 'starkad_poseidon.sage', _ROUND_TPL_PS),
+    'Starkad_S128a': MpcSageParams('Starkad_S128a', 'Bin127', (8, 85), 'starkad_poseidon.sage', _ROUND_TPL_PS),
+    'Starkad_S128b': MpcSageParams('Starkad_S128b', 'Bin255', (8, 88), 'starkad_poseidon.sage', _ROUND_TPL_PS),
+    'Starkad_S128c': MpcSageParams('Starkad_S128c', 'Bin127', (8, 86), 'starkad_poseidon.sage', _ROUND_TPL_PS),
+    'Starkad_S128d': MpcSageParams('Starkad_S128d', 'Bin63', (8, 43), 'starkad_poseidon.sage', _ROUND_TPL_PS),
+    'Starkad_S128e': MpcSageParams('Starkad_S128e', 'Bin255', (8, 88), 'starkad_poseidon.sage', _ROUND_TPL_PS),
+
+    'Rescue_S45a': MpcSageParams('Rescue_S45a', 'F91', (10,), 'vision.sage'),
+    'Rescue_S45b': MpcSageParams('Rescue_S45b', 'F91', (10,), 'vision.sage'),
+    'Rescue_S80a': MpcSageParams('Rescue_S80a', 'F81', (10,), 'vision.sage'),
+    'Rescue_S80b': MpcSageParams('Rescue_S80b', 'F161', (10,), 'vision.sage'),
+    'Rescue_S128a': MpcSageParams('Rescue_S128a', 'F125', (16,), 'vision.sage'),
+    'Rescue_S128b': MpcSageParams('Rescue_S128b', 'F253', (22,), 'vision.sage'),
+    'Rescue_S128e': MpcSageParams('Rescue_S128e', 'F253', (10,), 'vision.sage'),
+
+    'Vision_S45a': MpcSageParams('Vision_S45a', 'Bin91', (10,), 'vision.sage'),
+    'Vision_S45b': MpcSageParams('Vision_S45b', 'Bin91', (10,), 'vision.sage'),
+    'Vision_S80a': MpcSageParams('Vision_S80a', 'Bin81', (10,), 'vision.sage'),
+    'Vision_S80b': MpcSageParams('Vision_S80b', 'Bin161', (10,), 'vision.sage'),
+    'Vision_S128a': MpcSageParams('Vision_S128a', 'Bin127', (12,), 'vision.sage'),
+    'Vision_S128b': MpcSageParams('Vision_S128b', 'Bin255', (26,), 'vision.sage'),
+    'Vision_S128d': MpcSageParams('Vision_S128d', 'Bin63', (10,), 'vision.sage'),
+
+    'S45a': MpcSageParams('S45a', 'F91', (121,), 'gmimc.sage'),
+    'S45b': MpcSageParams('S45b', 'F91', (137,), 'gmimc.sage'),
+    'S80a': MpcSageParams('S80a', 'F81', (111,), 'gmimc.sage'),
+    'S80b': MpcSageParams('S80b', 'F161', (210,), 'gmimc.sage'),
+    'S128a': MpcSageParams('S128a', 'F125', (166,), 'gmimc.sage'),
+    'S128e': MpcSageParams('S128e', 'F253', (342,), 'gmimc.sage'),
+
+    'S45': MpcSageParams('S45', 'F91', (116,), 'mimc_hash.sage'),
+    'S80': MpcSageParams('S80', 'F161', (204,), 'mimc_hash.sage'),
+    'S128': MpcSageParams('S128', 'F253', (320,), 'mimc_hash.sage'),
+}  # type: dict[str, MpcSageParams]
+
+
 class ExpRec:
     def __init__(self, ename, ssize, fname, tpl_file, cfg_type=None):
         self.ename = ename
@@ -471,7 +545,7 @@ def augment_round_configs(to_gen):
     return res
 
 
-def gen_posseidon(data_sizes=None, eprefix=None):
+def gen_posseidon(data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW):
     rstsr = '--rf 2 --rp 0 --red-rf1 %s --red-rf2 %s --red-rp %s'
 
     # fname, field name, rounds structure, sage file, round string, rounds to test
@@ -484,14 +558,14 @@ def gen_posseidon(data_sizes=None, eprefix=None):
         # ('Poseidon_S128e', 'F253', (8, 85), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
         ('Poseidon_S128_BLS12_138', 'F_QBLS12_381', (8, 60), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
     ]
-    return gen_prime_config(to_gen, data_sizes, eprefix=eprefix)
+    return gen_prime_config(to_gen, data_sizes, eprefix=eprefix, streams=streams)
 
 
-def gen_starkad(data_sizes=None, eprefix=None):
+def gen_starkad(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW):
     rstsr = '--rf 2 --rp 0 --red-rf1 %s --red-rf2 %s --red-rp %s'
 
     # fname, field name, rounds structure, sage file, round string, rounds to test
-    to_gen = [
+    to_gen = to_gen if to_gen else [
         ('Starkad_S80b', 'Bin161', (8, 52), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
         # ('Starkad_S128a', 'Bin127', (8, 85), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
         # ('Starkad_S128b', 'Bin255', (8, 88), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
@@ -499,14 +573,14 @@ def gen_starkad(data_sizes=None, eprefix=None):
         # ('Starkad_S128d', 'Bin63', (8, 43), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
         ('Starkad_S128e', 'Bin255', (8, 88), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
     ]
-    return gen_binary_config(to_gen, data_sizes, eprefix=eprefix)
+    return gen_binary_config(to_gen, data_sizes, eprefix=eprefix, streams=streams)
 
 
-def gen_rescue(data_sizes=None, eprefix=None):
+def gen_rescue(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW):
     rstsr = '-r %s'
 
     # fname, field name, rounds structure, sage file, round string, rounds to test
-    to_gen = [
+    to_gen = to_gen if to_gen else [
         ('Rescue_S45a', 'F91', (10,), 'vision.sage', rstsr, [(1,), (2,)]),
         # ('Rescue_S45b', 'F91', (10,), 'vision.sage', rstsr, [(1,), (2,)]),
         # ('Rescue_S80a', 'F81', (10,), 'vision.sage', rstsr, [(1,), (2,)]),
@@ -515,14 +589,14 @@ def gen_rescue(data_sizes=None, eprefix=None):
         # ('Rescue_S128b', 'F253', (22,), 'vision.sage', rstsr, [(1,), (2,)]),
         ('Rescue_S128e', 'F253', (10,), 'vision.sage', rstsr, [(1,), (2,)]),
     ]
-    return gen_prime_config(to_gen, data_sizes, eprefix=eprefix)
+    return gen_prime_config(to_gen, data_sizes, eprefix=eprefix, streams=streams)
 
 
-def gen_vision(data_sizes=None, eprefix=None):
+def gen_vision(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW):
     rstsr = '-r %s'
 
     # fname, field name, rounds structure, sage file, round string, rounds to test
-    to_gen = [
+    to_gen = to_gen if to_gen else [
         ('Vision_S45a', 'Bin91', (10,), 'vision.sage', rstsr, [(1,), (2,)]),
         # ('Vision_S45b', 'Bin91', (10,), 'vision.sage', rstsr, [(1,), (2,)]),
         # ('Vision_S80a', 'Bin81', (10,), 'vision.sage', rstsr, [(1,), (2,)]),
@@ -531,14 +605,14 @@ def gen_vision(data_sizes=None, eprefix=None):
         # ('Vision_S128b', 'Bin255', (26,), 'vision.sage', rstsr, [(1,), (2,)]),
         ('Vision_S128d', 'Bin63', (10,), 'vision.sage', rstsr, [(1,), (2,)]),
     ]
-    return gen_binary_config(to_gen, data_sizes, eprefix=eprefix)
+    return gen_binary_config(to_gen, data_sizes, eprefix=eprefix, streams=streams)
 
 
-def gen_gmimc(data_sizes=None, eprefix=None):
+def gen_gmimc(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW):
     rstsr = '-r %s'
 
     # fname, field name, rounds structure, sage file, round string, rounds to test
-    to_gen = [
+    to_gen = to_gen if to_gen else [
         ('S45a', 'F91', (121,), 'gmimc.sage', rstsr, [(1,), (2,)]),
         # ('S45b', 'F91', (137,), 'gmimc.sage', rstsr, [(1,), (2,)]),
         # ('S80a', 'F81', (111,), 'gmimc.sage', rstsr, [(1,), (2,)]),
@@ -546,19 +620,19 @@ def gen_gmimc(data_sizes=None, eprefix=None):
         # ('S128a', 'F125', (166,), 'gmimc.sage', rstsr, [(1,), (2,)]),
         ('S128e', 'F253', (342,), 'gmimc.sage', rstsr, [(1,), (2,)]),
     ]
-    return gen_prime_config(to_gen, data_sizes, eprefix=eprefix)
+    return gen_prime_config(to_gen, data_sizes, eprefix=eprefix, streams=streams)
 
 
-def gen_mimc(data_sizes=None, eprefix=None):
+def gen_mimc(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW):
     rstsr = '-r %s'
 
     # fname, field name, rounds structure, sage file, round string, rounds to test
-    to_gen = [
+    to_gen = to_gen if to_gen else [
         ('S45', 'F91', (116,), 'mimc_hash.sage', rstsr, [(1,), (2,)]),
         ('S80', 'F161', (204,), 'mimc_hash.sage', rstsr, [(1,), (2,)]),
         ('S128', 'F253', (320,), 'mimc_hash.sage', rstsr, [(1,), (2,)]),
     ]
-    return gen_prime_config(to_gen, data_sizes, eprefix=eprefix)
+    return gen_prime_config(to_gen, data_sizes, eprefix=eprefix, streams=streams)
 
 
 def gen_all(data_sizes=None, eprefix=None):
@@ -622,12 +696,12 @@ def get_binary_accepting_ratio():
     return 1
 
 
-def gen_prime_config(to_gen, data_sizes=None, eprefix=None):
-    return gen_script_config(to_gen, True, data_sizes=data_sizes, eprefix=eprefix)
+def gen_prime_config(to_gen, data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW):
+    return gen_script_config(to_gen, True, data_sizes=data_sizes, eprefix=eprefix, streams=streams)
 
 
-def gen_binary_config(to_gen, data_sizes=None, eprefix=None):
-    return gen_script_config(to_gen, False, data_sizes=data_sizes, eprefix=eprefix)
+def gen_binary_config(to_gen, data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW):
+    return gen_script_config(to_gen, False, data_sizes=data_sizes, eprefix=eprefix, streams=streams)
 
 
 def myformat(_fmtstr, **kwargs):
@@ -636,7 +710,7 @@ def myformat(_fmtstr, **kwargs):
     return _fmtstr
 
 
-def gen_script_config(to_gen, is_prime=True, data_sizes=None, eprefix=None):
+def gen_script_config(to_gen, is_prime=True, data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW):
     data_sizes = data_sizes or [100 * 1024 * 1024]
 
     tpl = '{{SAGE_BIN}} {{RTT_EXEC}}/rtt-mpc/rtt_mpc/{{sfile}} ' \
@@ -685,14 +759,14 @@ def gen_script_config(to_gen, is_prime=True, data_sizes=None, eprefix=None):
             ('ctr00-b%s' % inp_block_bytes, make_ctr_config(inp_block_bytes, offset='00', min_data=min_data)),
             ('ctr01-b%s' % inp_block_bytes, make_ctr_config(inp_block_bytes, offset='01', min_data=min_data)),
             ('ctr02-b%s' % inp_block_bytes, make_ctr_config(inp_block_bytes, offset='02', min_data=min_data)),
-        ]
+        ] if StreamOptions.has_ctr(streams) else []
 
         weight = comp_hw_weight(inp_block_bytes, samples=3, min_data=min_data)
         hw_configs = [
             ('lhw00-b%s-w%s' % (inp_block_bytes, weight), make_hw_config(inp_block_bytes, weight=weight, offset_range=0.0, min_data=min_data)),
             ('lhw01-b%s-w%s' % (inp_block_bytes, weight), make_hw_config(inp_block_bytes, weight=weight, offset_range=1/3., min_data=min_data)),
             ('lhw02-b%s-w%s' % (inp_block_bytes, weight), make_hw_config(inp_block_bytes, weight=weight, offset_range=2/3., min_data=min_data)),
-        ]
+        ] if StreamOptions.has_lhw(streams) else []
 
         agg_inputs = ctr_configs + hw_configs
         agg_spreads = get_prime_strategies(moduli, moduli_bits, out_block_bits, max_out_b) if is_prime \
@@ -726,27 +800,32 @@ def gen_script_config(to_gen, is_prime=True, data_sizes=None, eprefix=None):
                 }
               }
             }
-            agg_scripts.append((ename, max_out/1024/1024, script,))
+            agg_scripts.append(ExpRec(ename=ename, ssize=max_out / 1024 / 1024, fname=ename + '.json',
+                                      tpl_file=script, cfg_type='rtt-data-gen-config'))
     return agg_scripts
 
 
-def gen_lowmc(data_sizes=None, eprefix=None):
+def gen_lowmc(data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW):
     """lowmc operates over binary field / whole bit blocks"""
 
     to_gen = [
-        # name, rounds-all, keysize, blocksize, sboxes, rounds to try
-        ('lowmc-s80a', (12, ), 80, 256, 49, [3, 4, 5, 6, 7, 8, 9, 10, 11]),
-        ('lowmc-s80b', (12, ), 80, 128, 31, [3, 4, 5, 6, 7, 8, 9, 10, 11]),
-        ('lowmc-s128a', (14, ), 128, 256, 63, [3, 4, 5, 6, 7, 8, 9, 10, 11]),
-        ('lowmc-s128b', (252, ), 128, 128, 1, [3, 4, 5, 6, 7, 8, 9, 10, 11, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240]),
-        ('lowmc-s128c', (128, ), 128, 128, 2, [3, 4, 5, 6, 7, 8, 9, 10, 11, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110]),
-        ('lowmc-s128d', (88, ), 128, 128, 3, [3, 4, 5, 6, 7, 8, 9, 10, 11, 20, 30, 40, 50, 60, 70, 80]),
+        # name, rounds-all, rounds to try
+        ('lowmc-s80a', (12, ), [3, 4, 5, 6, 7, 8, 9, 10, 11]),
+        ('lowmc-s80b', (12, ), [3, 4, 5, 6, 7, 8, 9, 10, 11]),
+        ('lowmc-s128a', (14, ), [3, 4, 5, 6, 7, 8, 9, 10, 11]),
+        ('lowmc-s128b', (252, ), [3, 4, 5, 6, 7, 8, 9, 10, 11, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240]),
+        ('lowmc-s128c', (128, ), [3, 4, 5, 6, 7, 8, 9, 10, 11, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110]),
+        ('lowmc-s128d', (88, ), [3, 4, 5, 6, 7, 8, 9, 10, 11, 20, 30, 40, 50, 60, 70, 80]),
 
-        # ('lowmc-s128b', (252, ), 128, 128, 1, [146, 151, 152, 153, 154, 155, 156, 157, 158, 159]),
-        # ('lowmc-s128c', (128, ), 128, 128, 2, [108, 109, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128]),
-        # ('lowmc-s128d', (88, ), 128, 128, 3, [59, 61, 62, 63, 64, 65]),
+        # ('lowmc-s128b', (252, ), [146, 151, 152, 153, 154, 155, 156, 157, 158, 159]),
+        # ('lowmc-s128c', (128, ), [108, 109, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128]),
+        # ('lowmc-s128d', (88, ), [59, 61, 62, 63, 64, 65]),
     ]
 
+    return gen_lowmc_core(to_gen, data_sizes, eprefix, streams)
+
+
+def gen_lowmc_core(to_gen, data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW):
     data_sizes = data_sizes or [100 * 1024 * 1024]
     full_tpl = '{{CRYPTOSTREAMS_BIN}} -c={{FILE_CONFIG1.JSON}}'
 
@@ -754,20 +833,21 @@ def gen_lowmc(data_sizes=None, eprefix=None):
     agg_scripts = []
     for ccfg in itertools.product(augment_round_configs(to_gen), data_sizes):
         cpos = ccfg[0]
+        cname = cpos[0]
         max_out = ccfg[1]
         cround = cpos[-1]
 
-        inp_block_bytes = cpos[3] // 8
-        key_size = cpos[2] // 8
-        sboxes = cpos[4]
+        inp_block_bytes = LOWMC_PARAMS[cname].block_size // 8
+        key_size = LOWMC_PARAMS[cname].key_size // 8
+        sboxes = LOWMC_PARAMS[cname].sboxes
         min_data = max_out
-        tv_count = int(math.ceil(8*max_out / cpos[3]))
+        tv_count = int(math.ceil(8*max_out / LOWMC_PARAMS[cname].block_size))
 
         ctr_configs = [
             ('ctr00-b%s' % inp_block_bytes, make_ctr_config(inp_block_bytes, offset='00', min_data=min_data), '0000000000000000'),
             ('ctr01-b%s' % inp_block_bytes, make_ctr_config(inp_block_bytes, offset='01', min_data=min_data), '0000000000000001'),
             ('ctr02-b%s' % inp_block_bytes, make_ctr_config(inp_block_bytes, offset='02', min_data=min_data), '0000000000000002'),
-        ]
+        ] if StreamOptions.has_ctr(streams) else []
 
         weight = comp_hw_weight(inp_block_bytes, samples=3, min_data=min_data)
         hw_configs = [
@@ -777,9 +857,15 @@ def gen_lowmc(data_sizes=None, eprefix=None):
              make_hw_config(inp_block_bytes, weight=weight, offset_range=1/3., min_data=min_data), '0000000000000004'),
             ('lhw02-b%s-w%s' % (inp_block_bytes, weight),
              make_hw_config(inp_block_bytes, weight=weight, offset_range=2/3., min_data=min_data), '0000000000000005'),
-        ]
+        ] if StreamOptions.has_lhw(streams) else []
 
-        agg_inputs = ctr_configs + hw_configs
+        sac_configs = [
+            ('sac00-b%s' % inp_block_bytes, {'type': 'sac'}, '0000000000000006'),
+            ('sac01-b%s' % inp_block_bytes, {'type': 'sac'}, '0000000000000007'),
+            ('sac02-b%s' % inp_block_bytes, {'type': 'sac'}, '0000000000000008'),
+        ] if StreamOptions.has_sac(streams) else []
+
+        agg_inputs = ctr_configs + hw_configs + sac_configs
         agg_spreads = [('', None)]  # get_binary_strategies(moduli_bits, out_block_bits, max_out_b)
 
         for configs in itertools.product(agg_spreads, agg_inputs):
@@ -793,7 +879,7 @@ def gen_lowmc(data_sizes=None, eprefix=None):
             agg_configs.append((inp, cfull_tpl))
             ename = '%s%s-%s-raw-r%s-inp-%s-spr-%s-s%sMB' \
                     % (eprefix or '', cpos[0], 'bin',
-                       cpos[5], inp_name, spread_name, int(max_out / 1024 / 1024))
+                       cpos[2], inp_name, spread_name, int(max_out / 1024 / 1024))
 
             lowmc_cfg = {
                 "type": "block",
@@ -838,7 +924,8 @@ def gen_lowmc(data_sizes=None, eprefix=None):
                     }
                 }
             }
-            agg_scripts.append((ename, max_out / 1024 / 1024, script,))
+            agg_scripts.append(ExpRec(ename=ename, ssize=max_out / 1024 / 1024, fname=ename + '.json',
+                                      tpl_file=script, cfg_type='rtt-data-gen-config'))
     return agg_scripts
 
 
@@ -998,12 +1085,13 @@ def write_submit_obj(data: List[ExpRec]):
     with open('__enqueue.sh', 'w+') as fh:
         fh.write("#!/bin/bash\n")
 
-        for coff in data:
+        for ix, coff in enumerate(data):
             with open(coff.fname, 'w+') as fhc:
                 fhc.write(json.dumps(coff.tpl_file, indent=2))
 
             # fh.write("submit_experiment --dieharder --email ph4r05@gmail.com  --name 't06-dieharder-%s' --cfg 'dieharder-paper-1GB.json' --cryptostreams-config '%s'\n" % (name, name))
+            fh.write(f"echo {ix+1}/{len(data)}\n")
             fh.write("submit_experiment --all_batteries "
                      "--name '%s' "
                      "--cfg '/home/debian/rtt-home/RTTWebInterface/media/predefined_configurations/%sMB.json' "
-                     "--%s '%s'\n" % (coff.ename, coff.ssize, coff.cfg_type, coff.fname))
+                     "--%s '%s'\n" % (coff.ename, int(coff.ssize), coff.cfg_type, coff.fname))
