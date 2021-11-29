@@ -725,7 +725,7 @@ class Cleaner:
                     nname = re.sub(r'^testmpc([\d]+)-', 'testmpc%02d-' % smidx, nname)
                     ssize = '100' if ('-s100MiB' in name or '-s100MB' in name) else '10'
                     if new_size:
-                        nname = re.sub(r'-s([\d]+)Mi?B\b', '-s%sMB-' % (int(new_size / 1024 / 1024)), nname)
+                        nname = re.sub(r'-s([\d]+)Mi?B\b', '-s%sMB' % (int(new_size / 1024 / 1024)), nname)
                         ssize = str(int(new_size / 1024 / 1024))
 
                     config_js['note'] = nname
@@ -751,7 +751,9 @@ class Cleaner:
 
         with open(os.path.join(tmpdir, '__enqueue.sh'), 'w+') as fh:
             fh.write('#!/bin/bash\n')
-            for nname, fname, ssize, ptype in file_names:
+            for ix, (nname, fname, ssize, ptype) in enumerate(file_names):
+                logger.info(f'submit: {nname}, {fname}, {ssize} MB')
+                fh.write(f"echo {ix}/{len(file_names)}\n")
                 fh.write(f"submit_experiment --all_batteries --name '{nname}' --cfg '/home/debian/rtt-home/RTTWebInterface/media/predefined_configurations/{ssize}MB.json' {ptype} '{fname}'\n")
 
     @staticmethod
