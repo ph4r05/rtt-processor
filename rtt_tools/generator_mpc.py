@@ -204,6 +204,19 @@ class StreamOptions:
     def has_rnd(x):
         return (x & StreamOptions.RND) > 0
 
+    @staticmethod
+    def from_str(x):
+        if 'ctr' in x:
+            return StreamOptions.CTR
+        elif 'hw' in x:
+            return StreamOptions.LHW
+        elif 'sac' in x:
+            return StreamOptions.SAC
+        elif 'rnd' in x:
+            return StreamOptions.RND
+        elif 'zero' in x:
+            return StreamOptions.ZERO
+
 
 @lru_cache(maxsize=1024)
 def comb(n, k, exact=False):
@@ -937,6 +950,30 @@ def int_to_seed(seed):
     return int_to_hex(seed, 8)
 
 
+def get_single_stream(stream, bsize=None, offset=None, tv_count=None, weight=None, nsamples=None):
+    if isinstance(stream, StreamRec):
+        return stream.sscript
+    if isinstance(stream, dict):
+        return stream
+    if not isinstance(stream, int):
+        raise ValueError(f'Unsupported stream: {stream}')
+
+    if StreamOptions.has_rnd(stream):
+        return {"type": "pcg32_stream"}
+    elif StreamOptions.has_zero(stream):
+        return {"type": "false_stream"}
+    elif StreamOptions.has_sac(stream):
+        return {"type": "sac"}
+    elif StreamOptions.has_ctr(stream):
+        return make_ctr_config(bsize, offset=int_to_hex(offset, 1), tv_count=tv_count, core_only=True)
+    elif StreamOptions.has_lhw(stream):
+        weight = weight if weight else comp_hw_weight(bsize, samples=nsamples or 1, min_samples=tv_count)
+        return make_hw_config(bsize, weight=weight, offset_range=offset / float(nsamples or 1),
+                              tv_count=tv_count, return_aux=True).core
+    else:
+        raise ValueError(f'Unsupported single stream: {stream}')
+
+
 def gen_col_iv(is_block=True):
     if is_block:
         return {
@@ -953,20 +990,21 @@ def gen_col_iv(is_block=True):
 
 
 def generate_block_col(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
-                       streams=StreamOptions.CTR_LHW):
-    return generate_cfg_col('block', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix, streams)
+                       streams=StreamOptions.CTR_LHW, inp_stream=StreamOptions.ZERO):
+    return generate_cfg_col('block', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix,
+                            streams, inp_stream)
 
 
 def generate_stream_col(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
-                        streams=StreamOptions.CTR_LHW):
+                        streams=StreamOptions.CTR_LHW, inp_stream=StreamOptions.ZERO):
     return generate_cfg_col('stream_cipher', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix,
-                            streams)
+                            streams, inp_stream)
 
 
 def generate_prng_col(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
-                      streams=StreamOptions.CTR_LHW):
+                      streams=StreamOptions.CTR_LHW, inp_stream=StreamOptions.ZERO):
     return generate_cfg_col('prng', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix,
-                            streams)
+                            streams, inp_stream)
 
 
 def generate_streams(tv_count, tv_size, streams=StreamOptions.CTR_LHW, nexps=3):
@@ -1009,8 +1047,9 @@ def generate_streams(tv_count, tv_size, streams=StreamOptions.CTR_LHW, nexps=3):
 
 
 def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
-                     streams=StreamOptions.CTR_LHW):
+                     streams=StreamOptions.CTR_LHW, inp_stream=StreamOptions.ZERO):
     """
+    inp_stream is more or less useless for stream functions as they generate a keystream
     tv_size defines number of bytes to generate using current key value
     Inspired by taro_proc.py
     """
@@ -1025,6 +1064,14 @@ def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=16, key_s
     if not is_block and not is_stream and not is_prng:
         raise ValueError('Unknown alg type: %s' % (alg_type,))
 
+    aux_inp_spec = ''
+    if StreamOptions.has_ctr(inp_stream):
+        aux_inp_spec = '..inp.ctr'
+    elif StreamOptions.has_lhw(inp_stream):
+        aux_inp_spec = '..inp.lhw'
+    elif StreamOptions.has_rnd(inp_stream):
+        aux_inp_spec = '..inp.rnd'
+
     agg_inputs = generate_streams(tv_count=key_count, tv_size=inp_block_bytes, streams=streams, nexps=nexps)
     agg_scripts = []
     for configs in agg_inputs:
@@ -1035,7 +1082,7 @@ def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=16, key_s
         seed = configs.seed
 
         note = f'{eprefix}{algorithm}-t:{alg_type}-r:{cround}-b:{tv_size}-' \
-               f's:{size_mbs}MiB-e:{eid}-i:{src_type}.key-{inp_name}'
+               f's:{size_mbs}MiB-e:{eid}-i:{src_type}.key{aux_inp_spec}-{inp_name}'
         fname = note.replace(':', '_') + '.json'
 
         tpl = {
@@ -1052,9 +1099,7 @@ def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=16, key_s
                 "algorithm": algorithm,
                 "round": cround,
                 "block_size": tv_size,
-                "plaintext": {
-                    "type": "false_stream"
-                },
+                "plaintext": get_single_stream(inp_stream, bsize=tv_size, offset=0, tv_count=tv_count),
                 "key_size": key_size,
                 "key": key_config,
                 "iv_size": iv_size,
@@ -1080,28 +1125,31 @@ def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=16, key_s
 
 
 def generate_prng_inp(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
-                      streams=StreamOptions.CTR_LHW_SAC):
-    return generate_cfg_inp('prng', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix, streams)
+                      streams=StreamOptions.CTR_LHW_SAC, key_stream=StreamOptions.RND):
+    return generate_cfg_inp('prng', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix, streams,
+                            key_stream)
 
 
 def generate_hash_inp(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
-                      streams=StreamOptions.CTR_LHW_SAC):
-    return generate_cfg_inp('hash', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix, streams)
+                      streams=StreamOptions.CTR_LHW_SAC, key_stream=StreamOptions.RND):
+    return generate_cfg_inp('hash', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix, streams,
+                            key_stream)
 
 
 def generate_block_inp(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
-                       streams=StreamOptions.CTR_LHW_SAC):
-    return generate_cfg_inp('block', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix, streams)
+                       streams=StreamOptions.CTR_LHW_SAC, key_stream=StreamOptions.RND):
+    return generate_cfg_inp('block', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix, streams,
+                            key_stream)
 
 
 def generate_stream_inp(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
-                        streams=StreamOptions.CTR_LHW_SAC):
+                        streams=StreamOptions.CTR_LHW_SAC, key_stream=StreamOptions.RND):
     return generate_cfg_inp('stream_cipher', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix,
-                            streams)
+                            streams, key_stream)
 
 
 def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
-                     streams=StreamOptions.CTR_LHW_SAC):
+                     streams=StreamOptions.CTR_LHW_SAC, key_stream=StreamOptions.RND):
     """
     Generates cryptostreams-based hash/block/stream cipher/prng config with plaintext/source input strategies
     """
@@ -1115,6 +1163,14 @@ def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=16, key_s
     if not is_block and not is_stream and not is_prng and not is_hash:
         raise ValueError('Unknown alg type: %s' % (alg_type,))
 
+    aux_key_spec = ''
+    if StreamOptions.has_ctr(key_stream):
+        aux_key_spec = '..key.ctr'
+    elif StreamOptions.has_lhw(key_stream):
+        aux_key_spec = '..key.lhw'
+    elif StreamOptions.has_zero(key_stream):
+        aux_key_spec = '..key.zero'
+
     agg_inputs = generate_streams(tv_count=tv_count, tv_size=tv_size, streams=streams, nexps=nexps)
     agg_scripts = []
     for configs in agg_inputs:
@@ -1125,7 +1181,7 @@ def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=16, key_s
         seed = configs.seed
 
         note = f'{eprefix}{algorithm}-t:{alg_type}-r:{cround}-b:{tv_size}-' \
-               f's:{size_mbs}MiB-e:{eid}-i:{src_type}.key-{inp_name}'
+               f's:{size_mbs}MiB-e:{eid}-i:{src_type}{aux_key_spec}-{inp_name}'
         fname = note.replace(':', '_') + '.json'
 
         tpl = {
@@ -1162,9 +1218,7 @@ def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=16, key_s
         else:
             tpl['stream']['plaintext'] = inp_config
             tpl['stream']['key_size'] = key_size
-            tpl['stream']['key'] = {
-                "type": "pcg32_stream"
-            }
+            tpl['stream']['key'] = get_single_stream(key_stream, bsize=key_size, offset=0, tv_count=1),  # no re-keying
             tpl['stream']['iv_size'] = iv_size
             tpl['stream']['iv'] = {
                 "type": "false_stream"
@@ -1184,17 +1238,27 @@ def write_submit(data, cfg_type='rtt-data-gen-config'):
     return write_submit_obj(ndata)
 
 
-def write_submit_obj(data: List[ExpRec]):
-    with open('__enqueue.sh', 'w+') as fh:
-        fh.write("#!/bin/bash\n")
+def write_submit_obj(data: List[ExpRec], fh=None, sdir=None):
+    if fh:
+        return write_submit_fh(fh, data)
 
-        for ix, coff in enumerate(data):
-            with open(coff.fname, 'w+') as fhc:
-                fhc.write(json.dumps(coff.tpl_file, indent=2))
+    with open(os.path.join(sdir or '', '__enqueue.sh'), 'w+') as fh:
+        write_submit_fh(fh, data, sdir=sdir)
 
-            # fh.write("submit_experiment --dieharder --email ph4r05@gmail.com  --name 't06-dieharder-%s' --cfg 'dieharder-paper-1GB.json' --cryptostreams-config '%s'\n" % (name, name))
-            fh.write(f"echo '{ix+1}/{len(data)}'\n")
-            fh.write("submit_experiment --all_batteries "
-                     "--name '%s' "
-                     "--cfg '/home/debian/rtt-home/RTTWebInterface/media/predefined_configurations/%sMB.json' "
-                     "--%s '%s'\n" % (coff.ename, int(coff.ssize), coff.cfg_type, coff.fname))
+
+def write_submit_fh(fh, data: List[ExpRec], sdir=None):
+    fh.write("#!/bin/bash\n")
+
+    for ix, coff in enumerate(data):
+        write_submit_rec(fh, coff, ix, len(data), sdir=sdir)
+
+
+def write_submit_rec(fh, coff: ExpRec, ix: int, total: int, sdir=None):
+    with open(os.path.join(sdir or '', coff.fname), 'w+') as fhc:
+        fhc.write(json.dumps(coff.tpl_file, indent=2))
+
+    fh.write(f"echo '{ix + 1}/{total}'\n")
+    fh.write("submit_experiment --all_batteries "
+             "--name '%s' "
+             "--cfg '/home/debian/rtt-home/RTTWebInterface/media/predefined_configurations/%sMB.json' "
+             "--%s '%s'\n" % (coff.ename, int(coff.ssize), coff.cfg_type, coff.fname))
