@@ -17,7 +17,8 @@ import argparse
 from typing import Optional, List, Dict, Tuple, Union, Any, Sequence, Iterable, Collection
 
 from rtt_tools.generator_mpc import get_input_key, get_input_size, comp_hw_weight, make_hw_config, HwConfig, \
-    comb_cached, rank, HwSpaceTooSmall
+    comb_cached, rank, HwSpaceTooSmall, generate_cfg_col, StreamOptions, ExpRec, write_submit_obj
+from rtt_tools.gen.max_rounds import FUNC_DB, FuncDb, FuncInfo
 from rtt_tools.utils import natural_sort_key
 
 logger = logging.getLogger(__name__)
@@ -412,7 +413,7 @@ class Cleaner:
                 try_execute(lambda: c.execute(sql_exps, (nname, eid,)),
                             msg="Update experiment with ID %s" % eid)
 
-            self.conn.commit()
+                self.conn.commit()
             logger.info('Experiment %s solved' % (eid,))
 
     def fix_underscores(self):
@@ -609,10 +610,32 @@ class Cleaner:
             js.sort(key=natural_sort_key)
             json.dump(js, fh)
 
-    def comp_new_rounds(self, specs, tmpdir='/tmp/rspecs', smidx=5, new_size=None, skip_existing_since=None, clean_before=False):
+    def _name_find(self, nname_find):
+        nname_find = re.sub(r'^PH4-SM-([\d]+)-', '', nname_find)
+        nname_find = re.sub(r'^testmpc([\d]+)-', '', nname_find)
+        return nname_find
+
+    def _load_existing_exps(self, c, skip_existing_since):
+        existing_exps = {}
+        if skip_existing_since is None:
+            return existing_exps
+
+        logger.info("Loading exp name database to skip existing")
+        sql_sel = """SELECT e.id, name FROM experiments e
+                                     WHERE e.id >= %s
+                                  """ % (skip_existing_since,)
+        c.execute(sql_sel)
+        for result in c.fetchall():
+            nname_find = self._name_find(result[1])
+            existing_exps[nname_find] = result[0]
+        logger.info('Loaded database of %s expnames; %s' % (len(existing_exps), sql_sel,))
+        return existing_exps
+
+    def comp_new_rounds(self, specs, tmpdir='/tmp/rspecs', smidx=5, new_size=None, skip_existing_since=None,
+                        clean_before=False):
         """
         Generates submit_experiment for a new rounds to compute.
-        specs is: fname -> meth -> [[exids], [rounds]
+        specs is: fname -> meth -> [[exids], [rounds]]
         """
         if clean_before and os.path.exists(tmpdir):
             shutil.rmtree(tmpdir)
@@ -627,20 +650,9 @@ class Cleaner:
                     for cround in rec[1]:
                         eids_map[cexid].add(cround)
 
-        existing_exps = {}
         file_names = []
         with self.conn.cursor() as c:
-            if skip_existing_since is not None:
-                logger.info("Loading exp name database to skip existing")
-                sql_sel = """SELECT e.id, name FROM experiments e
-                             WHERE e.id >= %s
-                          """ % (skip_existing_since,)
-                c.execute(sql_sel)
-                for result in c.fetchall():
-                    name = result[1]
-                    nname_find = re.sub(r'^PH4-SM-([\d]+)-', '', name)
-                    existing_exps[nname_find] = result[0]
-                logger.info('Loaded database of %s expnames; %s' % (len(existing_exps), sql_sel, ))
+            existing_exps = self._load_existing_exps(c, skip_existing_since)
 
             logger.info("Generating new round specs, eids: %s" % (', '.join(map(str, list(eids_map.keys())))))
             sql_sel = """SELECT e.id, name, dp.`provider_config`, dp.provider_name, dp.id, dp.provider_config_name
@@ -732,7 +744,7 @@ class Cleaner:
 
                     # Fname conversion, dump
                     fname = nname.replace(':', '_').replace('.json', '') + '.json'
-                    nname_find = re.sub(r'^testmpc([\d]+)-', '', nname)
+                    nname_find = self._name_find(nname)
                     if nname_find in existing_exps:
                         logger.info('  Eid %s -> r=%s, name=%s, fname=%s, nsize=%s SKIP'
                                     % (eid, cround, nname, fname, new_size))
@@ -749,12 +761,83 @@ class Cleaner:
                     print('Could not process provider %s' % (pname,))
                     continue
 
+        logger.info('Writing submit file')
         with open(os.path.join(tmpdir, '__enqueue.sh'), 'w+') as fh:
             fh.write('#!/bin/bash\n')
-            for ix, (nname, fname, ssize, ptype) in enumerate(file_names):
+            for ix, (nname, fname, ssize, ptype) in enumerate(sorted(file_names, key=lambda x: x[0])):
                 logger.info(f'submit: {nname}, {fname}, {ssize} MB')
-                fh.write(f"echo {ix}/{len(file_names)}\n")
+                fh.write(f"echo '{ix}/{len(file_names)}'\n")
                 fh.write(f"submit_experiment --all_batteries --name '{nname}' --cfg '/home/debian/rtt-home/RTTWebInterface/media/predefined_configurations/{ssize}MB.json' {ptype} '{fname}'\n")
+
+    def comp_new_rounds_col(self, specs, tmpdir='/tmp/rspecs', smidx=5, skip_existing_since=None,
+                            clean_before=False):
+        """
+        Generates submit_experiment for a new rounds to compute.
+        specs is: ftype:fname -> meth:size -> [rounds]
+        """
+        if clean_before and os.path.exists(tmpdir):
+            shutil.rmtree(tmpdir)
+        os.makedirs(tmpdir, exist_ok=True)
+
+        agg_scripts = []  # type: list[ExpRec]
+        with self.conn.cursor() as c:
+            existing_exps = self._load_existing_exps(c, skip_existing_since)
+            for ftypename in specs.keys():
+                fparts = ftypename.split(':')
+                ftype, funcname = int(fparts[0]), fparts[1]
+
+                erec = FUNC_DB.search(funcname, ftype)
+                if erec is None:
+                    logger.info(f'Function {ftypename} not found')
+                    continue
+
+                try:
+                    alg_type = erec.get_alg_type()
+                except:
+                    logger.info(f'Skipping unsupported {ftypename}')
+                    continue
+
+                for methsize in specs[ftypename].keys():
+                    meth_parts = methsize.split(':')
+                    meth, size = meth_parts[0], int(meth_parts[1])
+
+                    methsubs = meth.split('..')
+                    if '.key' not in methsubs[0]:
+                        logger.info(f'{ftypename}-{methsize} not .key')
+                        continue
+
+                    key_stream = StreamOptions.from_str(methsubs[0])
+                    has_plain = len(methsubs) > 1 and 'inp.' in methsubs[1]
+                    plain_type = methsubs[1].split('.')[1] if has_plain else None
+                    plain_str = StreamOptions.ZERO
+                    if plain_type == 'ctr':
+                        plain_str = StreamOptions.CTR
+                    elif plain_type == 'rnd':
+                        plain_str = StreamOptions.RND
+                    elif has_plain:
+                        logger.error(f'Unknown plain type: {meth}')
+                        continue
+
+                    for rnd in sorted(list(specs[ftypename][methsize])):
+                        agg_scripts += generate_cfg_col(
+                            alg_type, funcname, size, cround=rnd,
+                            tv_size=erec.block_size, key_size=erec.key_size, iv_size=erec.iv_size,
+                            nexps=3, eprefix='PH4-SM-%02d-' % smidx,
+                            streams=key_stream, inp_stream=plain_str)
+
+        logger.info('Writing submit file')
+        agg_filtered = []
+        with open(os.path.join(tmpdir, '__enqueue.sh'), 'w+') as fh:
+            fh.write('#!/bin/bash\n')
+            for crec in agg_scripts:
+                name_find = self._name_find(crec.ename)
+                if name_find in existing_exps:
+                    continue
+
+                logger.info(f'submit: {crec.ename}, {crec.fname}, {crec.ssize} MB')
+                agg_filtered.append(crec)
+
+        write_submit_obj(agg_filtered, sdir=tmpdir)
 
     @staticmethod
     def change_cstreams(config_js, cround, name, smidx, new_size=None, exp_count=3):
