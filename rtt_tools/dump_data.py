@@ -1181,6 +1181,9 @@ class Loader:
 
             for result in c.fetchall():  # break_exp_ph4
                 eid, name, data_file_size, data_file_sha256, config_file_id, data_file_id = result
+                if is_ph4_sm and 'stream:cipher' in name:
+                    name = name.replace('stream:cipher', 'stream_cipher')
+
                 exp_info = None
                 if is_sm:
                     exp_info = self.break_exp(name)
@@ -1215,9 +1218,10 @@ class Loader:
                     logger.warning('Could not parse exp %s' % (exp_obj,))
                     continue
 
-                if is_ph4_sm and data_file_size is not None and exp_info.size is not None and abs(data_file_size - exp_info.size) > 1024*1024:
-                    logger.warning('Data file size does not match exp size for eid %s, %s, %s'
-                                   % (eid, exp_obj, exp_info))
+                if is_ph4_sm and data_file_size is not None and exp_info.size is not None \
+                        and abs(data_file_size - exp_info.size) > exp_info.size * 0.1:
+                    logger.warning('Data file size does not match exp size for eid %s, %s, %s; data file: %s '
+                                   % (eid, exp_obj, exp_info, data_file_size))
 
                 if data_file_sha256 is None:
                     no_file_sizes.append(exp_obj)
