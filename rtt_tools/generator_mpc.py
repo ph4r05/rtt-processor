@@ -13,6 +13,8 @@ import json
 import logging
 import coloredlogs
 
+from rtt_tools.gen.max_rounds import FUNC_DB, FuncInfo
+
 if hasattr(scipy.misc, 'comb'):
     scipy_comb = scipy.misc.comb
 else:
@@ -989,19 +991,19 @@ def gen_col_iv(is_block=True):
         }
 
 
-def generate_block_col(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
+def generate_block_col(algorithm, data_size, cround=1, tv_size=None, key_size=None, iv_size=None, nexps=3, eprefix='',
                        streams=StreamOptions.CTR_LHW, inp_stream=StreamOptions.ZERO):
     return generate_cfg_col('block', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix,
                             streams, inp_stream)
 
 
-def generate_stream_col(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
+def generate_stream_col(algorithm, data_size, cround=1, tv_size=None, key_size=None, iv_size=None, nexps=3, eprefix='',
                         streams=StreamOptions.CTR_LHW, inp_stream=StreamOptions.ZERO):
     return generate_cfg_col('stream_cipher', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix,
                             streams, inp_stream)
 
 
-def generate_prng_col(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
+def generate_prng_col(algorithm, data_size, cround=1, tv_size=None, key_size=None, iv_size=None, nexps=3, eprefix='',
                       streams=StreamOptions.CTR_LHW, inp_stream=StreamOptions.ZERO):
     return generate_cfg_col('prng', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix,
                             streams, inp_stream)
@@ -1046,21 +1048,32 @@ def generate_streams(tv_count, tv_size, streams=StreamOptions.CTR_LHW, nexps=3):
     return agg_inputs
 
 
-def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
-                     streams=StreamOptions.CTR_LHW, inp_stream=StreamOptions.ZERO):
+def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=None, key_size=None, iv_size=None, nexps=3,
+                     eprefix='', streams=StreamOptions.CTR_LHW, inp_stream=StreamOptions.ZERO):
     """
     inp_stream is more or less useless for stream functions as they generate a keystream
     tv_size defines number of bytes to generate using current key value
     Inspired by taro_proc.py
     """
+    is_block = alg_type == 'block'
+    is_stream = alg_type == 'stream_cipher'
+    is_prng = alg_type == 'prng'
+
+    if tv_size is None or (key_size is None and (is_block or is_stream)):
+        ftype = FuncInfo.from_str(alg_type)
+        erec = FUNC_DB.search(algorithm, ftype)
+        if erec is None:
+            raise ValueError(f'Function {alg_type} {algorithm} not found')
+        tv_size = tv_size if tv_size else erec.block_size
+        key_size = key_size if key_size else erec.key_size
+        iv_size = iv_size if iv_size else erec.iv_size
+
     tv_count = int(math.ceil(data_size / tv_size))
     key_count = tv_count  # number of keys = number of test vectors. Reseed with each TV
     inp_block_bytes = key_size
     size_mbs = int(math.ceil(data_size / 1024 / 1024))
+    iv_size = iv_size or 0
 
-    is_block = alg_type == 'block'
-    is_stream = alg_type == 'stream_cipher'
-    is_prng = alg_type == 'prng'
     if not is_block and not is_stream and not is_prng:
         raise ValueError('Unknown alg type: %s' % (alg_type,))
 
@@ -1124,38 +1137,35 @@ def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=16, key_s
     return agg_scripts
 
 
-def generate_prng_inp(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
+def generate_prng_inp(algorithm, data_size, cround=1, tv_size=None, key_size=None, iv_size=None, nexps=3, eprefix='',
                       streams=StreamOptions.CTR_LHW_SAC, key_stream=StreamOptions.RND):
     return generate_cfg_inp('prng', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix, streams,
                             key_stream)
 
 
-def generate_hash_inp(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
+def generate_hash_inp(algorithm, data_size, cround=1, tv_size=None, key_size=None, iv_size=None, nexps=3, eprefix='',
                       streams=StreamOptions.CTR_LHW_SAC, key_stream=StreamOptions.RND):
     return generate_cfg_inp('hash', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix, streams,
                             key_stream)
 
 
-def generate_block_inp(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
+def generate_block_inp(algorithm, data_size, cround=1, tv_size=None, key_size=None, iv_size=None, nexps=3, eprefix='',
                        streams=StreamOptions.CTR_LHW_SAC, key_stream=StreamOptions.RND):
     return generate_cfg_inp('block', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix, streams,
                             key_stream)
 
 
-def generate_stream_inp(algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
+def generate_stream_inp(algorithm, data_size, cround=1, tv_size=None, key_size=None, iv_size=None, nexps=3, eprefix='',
                         streams=StreamOptions.CTR_LHW_SAC, key_stream=StreamOptions.RND):
     return generate_cfg_inp('stream_cipher', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix,
                             streams, key_stream)
 
 
-def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=16, key_size=16, iv_size=0, nexps=3, eprefix='',
-                     streams=StreamOptions.CTR_LHW_SAC, key_stream=StreamOptions.RND):
+def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=None, key_size=None, iv_size=None, nexps=3,
+                     eprefix='', streams=StreamOptions.CTR_LHW_SAC, key_stream=StreamOptions.RND):
     """
     Generates cryptostreams-based hash/block/stream cipher/prng config with plaintext/source input strategies
     """
-    tv_count = int(math.ceil(data_size / tv_size))
-    size_mbs = int(math.ceil(data_size / 1024 / 1024))
-
     is_block = alg_type == 'block'
     is_stream = alg_type == 'stream_cipher'
     is_prng = alg_type == 'prng'
@@ -1163,6 +1173,18 @@ def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=16, key_s
     if not is_block and not is_stream and not is_prng and not is_hash:
         raise ValueError('Unknown alg type: %s' % (alg_type,))
 
+    if tv_size is None or (key_size is None and (is_block or is_stream)):
+        ftype = FuncInfo.from_str(alg_type)
+        erec = FUNC_DB.search(algorithm, ftype)
+        if erec is None:
+            raise ValueError(f'Function {alg_type} {algorithm} not found')
+        tv_size = tv_size if tv_size else erec.block_size
+        key_size = key_size if key_size else erec.key_size
+        iv_size = iv_size if iv_size else erec.iv_size
+
+    iv_size = iv_size or 0
+    tv_count = int(math.ceil(data_size / tv_size))
+    size_mbs = int(math.ceil(data_size / 1024 / 1024))
     aux_key_spec = ''
     if StreamOptions.has_ctr(key_stream):
         aux_key_spec = '..key.ctr'

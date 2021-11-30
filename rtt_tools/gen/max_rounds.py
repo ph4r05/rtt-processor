@@ -30,6 +30,17 @@ class FuncInfo:
     def __repr__(self):
         return f'FuncInfo({self.fname}, {self.ftype}, {self.stype}, {self.max_rounds})'
 
+    @staticmethod
+    def from_str(x):
+        if x in ('block', 'stream_cipher'):
+            return FuncInfo.CIPHER
+        elif x == 'prng':
+            return FuncInfo.PRNG
+        elif x == 'hash':
+            return FuncInfo.HASH
+        else:
+            raise ValueError(f'Unknown type: {x}')
+
 
 class FuncDb:
     def __init__(self):
