@@ -180,6 +180,7 @@ class StreamOptions:
     LHW = 4
     SAC = 8
     RND = 16
+    ORND = 32
 
     CTR_LHW = CTR | LHW
     CTR_LHW_SAC = CTR_LHW | SAC
@@ -207,6 +208,10 @@ class StreamOptions:
         return (x & StreamOptions.RND) > 0
 
     @staticmethod
+    def has_rnd_once(x):
+        return (x & StreamOptions.ORND) > 0
+
+    @staticmethod
     def from_str(x):
         if 'ctr' in x:
             return StreamOptions.CTR
@@ -218,6 +223,8 @@ class StreamOptions:
             return StreamOptions.RND
         elif 'zero' in x:
             return StreamOptions.ZERO
+        elif 'ornd' in x:
+            return StreamOptions.ORND
         else:
             raise ValueError(f'Unknown generator: {x}')
 
@@ -964,6 +971,8 @@ def get_single_stream(stream, bsize=None, offset=None, tv_count=None, weight=Non
 
     if StreamOptions.has_rnd(stream):
         return {"type": "pcg32_stream"}
+    elif StreamOptions.has_rnd_once(stream):
+        return {"type": "single_value_stream", "source": {"type": "pcg32_stream"}}
     elif StreamOptions.has_zero(stream):
         return {"type": "false_stream"}
     elif StreamOptions.has_sac(stream):
@@ -1046,6 +1055,14 @@ def generate_streams(tv_count, tv_size, streams=StreamOptions.CTR_LHW, nexps=3):
         agg_inputs.append(
             StreamRec(stype='rnd', sdesc=f'{tv_size * 8}sbit-offset-{ix}', sscript=sscript,
                       expid=ix, seed=int_to_seed(3 * nexps + ix))
+        )
+
+    # ORND
+    for ix in range(nexps if StreamOptions.has_rnd_once(streams) else 0):
+        sscript = get_single_stream(StreamOptions.ORND)
+        agg_inputs.append(
+            StreamRec(stype='ornd', sdesc=f'{tv_size * 8}sbit-offset-{ix}', sscript=sscript,
+                      expid=ix, seed=int_to_seed(4 * nexps + ix))
         )
     return agg_inputs
 
