@@ -352,3 +352,70 @@ rr += g.gen_lowmc_core(to_gen, [10 * 1024 * 1024, 100 * 1024 * 1024], eprefix='t
 g.write_submit_obj(rr)
 ```
 
+# Single DES weak keys
+```python
+import os, shutil, itertools
+from rtt_tools import generator_mpc as g
+dname = '/tmp/ggen23'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]
+rr += list(itertools.chain.from_iterable(
+    [g.generate_block_col('SINGLE-DES', 100*1024*1024, r, 8, 7, 16, eprefix='PH4-SM-07-', streams=g.StreamOptions.CTR_LHW_SAC_RND) for r in range(1, 17)]))
+g.write_submit_obj(rr)
+```
+
+# LowMC manual 2
+
+```python
+import os, shutil
+from rtt_tools import generator_mpc as g
+dname = '/tmp/ggen24'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]
+
+to_gen = [
+    ('lowmc-s128b', (252, ), [17, 18, 19, 21, 89, 91]),
+]
+
+rr += g.gen_lowmc_core(to_gen, [10 * 1024 * 1024, 100 * 1024 * 1024], eprefix='testmpc21-')
+g.write_submit_obj(rr)
+```
+
+
+# Next new rounds
+```python
+import os, shutil, itertools
+from rtt_tools import generator_mpc as g
+dname = '/tmp/ggen25'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]
+rr += g.generate_stream_col('RC4', 10*1024*1024, 1, 32, 16, eprefix='PH4-SM-25-', streams=g.StreamOptions.SAC_RND)
+
+rr += g.generate_stream_col('Grain', 1000*1024*1024, 9, 16, 16, 12, eprefix='PH4-SM-25-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
+rr += g.generate_stream_col('Grain', 1000*1024*1024, 10, 16, 16, 12, eprefix='PH4-SM-25-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
+
+rr += g.generate_stream_col('SOSEMANUK', 100*1024*1024, 8, 16, 16, 16, eprefix='PH4-SM-25-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
+
+rr += list(itertools.chain.from_iterable(
+    [g.generate_block_col('TRIPLE-DES', 100*1024*1024, r, 8, 21, 16, eprefix='PH4-SM-25-', streams=g.StreamOptions.CTR_LHW_SAC_RND) for r in range(1, 17)]))
+rr += list(itertools.chain.from_iterable(
+    [g.generate_block_col('TRIPLE-DES', 10*1024*1024, r, 8, 21, 16, eprefix='PH4-SM-25-', streams=g.StreamOptions.CTR_LHW_SAC_RND) for r in range(1, 17)]))
+
+to_gen = [
+    ('lowmc-s128b', (252, ), [88, 92, 48, 49, 51, 52, 145, 147, 147, 149]),
+    ('lowmc-s128c', (None, ), [17, 18]),
+]
+
+rr += g.gen_lowmc_core(to_gen, [10 * 1024 * 1024, 100 * 1024 * 1024], eprefix='testmpc25-')
+
+rr += list(itertools.chain.from_iterable(
+    [g.generate_hash_inp('Tangle', 100*1024*1024, r, 32, None, None, eprefix='PH4-SM-25-', streams=g.StreamOptions.CTR) for r in range(32, 48)]))
+
+rr += list(itertools.chain.from_iterable(
+    [g.generate_hash_inp('Tangle2', 100*1024*1024, r, 32, None, None, eprefix='PH4-SM-25-', streams=g.StreamOptions.CTR) for r in range(33, 48)]))
+
+g.write_submit_obj(rr)
+```
