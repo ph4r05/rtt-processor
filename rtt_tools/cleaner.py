@@ -806,7 +806,7 @@ class Cleaner:
                     has_key_prim = '.key' in methsubs[0]
 
                     prim_stream = StreamOptions.from_str(methsubs[0])  # key_stream for .key, plaintext for inp
-                    has_plain_sec = len(methsubs) > 1 and 'inp.' in methsubs[1]
+                    has_plain_sec = len(methsubs) > 1 and '.inp' in methsubs[1]
 
                     sec_stream_type = methsubs[1].split('.')[1] if has_plain_sec else None
                     sec_stream_str = StreamOptions.from_str(sec_stream_type) if sec_stream_type else None

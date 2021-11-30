@@ -1081,11 +1081,11 @@ def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=None, key
 
     aux_inp_spec = ''
     if StreamOptions.has_ctr(inp_stream):
-        aux_inp_spec = '..inp.ctr'
+        aux_inp_spec = '..ctr.inp'
     elif StreamOptions.has_lhw(inp_stream):
-        aux_inp_spec = '..inp.lhw'
+        aux_inp_spec = '..lhw.inp'
     elif StreamOptions.has_rnd(inp_stream):
-        aux_inp_spec = '..inp.rnd'
+        aux_inp_spec = '..rnd.inp'
 
     agg_inputs = generate_streams(tv_count=key_count, tv_size=inp_block_bytes, streams=streams, nexps=nexps)
     agg_scripts = []
@@ -1189,11 +1189,11 @@ def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=None, key
     size_mbs = int(math.ceil(data_size / 1024 / 1024))
     aux_key_spec = ''
     if StreamOptions.has_ctr(key_stream):
-        aux_key_spec = '..key.ctr'
+        aux_key_spec = '..ctr.key'
     elif StreamOptions.has_lhw(key_stream):
-        aux_key_spec = '..key.lhw'
+        aux_key_spec = '..lhw.key'
     elif StreamOptions.has_zero(key_stream):
-        aux_key_spec = '..key.zero'
+        aux_key_spec = '..zero.key'
 
     agg_inputs = generate_streams(tv_count=tv_count, tv_size=tv_size, streams=streams, nexps=nexps)
     agg_scripts = []
