@@ -17,7 +17,7 @@ import argparse
 from typing import Optional, List, Dict, Tuple, Union, Any, Sequence, Iterable, Collection
 
 from rtt_tools.generator_mpc import get_input_key, get_input_size, comp_hw_weight, make_hw_config, HwConfig, \
-    comb_cached, rank, HwSpaceTooSmall, generate_cfg_col, StreamOptions, ExpRec, write_submit_obj
+    comb_cached, rank, HwSpaceTooSmall, generate_cfg_col, StreamOptions, ExpRec, write_submit_obj, generate_cfg_inp
 from rtt_tools.gen.max_rounds import FUNC_DB, FuncDb, FuncInfo
 from rtt_tools.utils import natural_sort_key
 
@@ -769,7 +769,7 @@ class Cleaner:
                 fh.write(f"echo '{ix}/{len(file_names)}'\n")
                 fh.write(f"submit_experiment --all_batteries --name '{nname}' --cfg '/home/debian/rtt-home/RTTWebInterface/media/predefined_configurations/{ssize}MB.json' {ptype} '{fname}'\n")
 
-    def comp_new_rounds_col(self, specs, tmpdir='/tmp/rspecs', smidx=5, skip_existing_since=None,
+    def comp_new_rounds_new(self, specs, tmpdir='/tmp/rspecs', smidx=5, skip_existing_since=None,
                             clean_before=False):
         """
         Generates submit_experiment for a new rounds to compute.
@@ -779,6 +779,7 @@ class Cleaner:
             shutil.rmtree(tmpdir)
         os.makedirs(tmpdir, exist_ok=True)
 
+        eprefix = 'PH4-SM-%02d-' % smidx
         agg_scripts = []  # type: list[ExpRec]
         with self.conn.cursor() as c:
             existing_exps = self._load_existing_exps(c, skip_existing_since)
@@ -802,28 +803,32 @@ class Cleaner:
                     meth, size = meth_parts[0], int(meth_parts[1])
 
                     methsubs = meth.split('..')
-                    if '.key' not in methsubs[0]:
-                        logger.info(f'{ftypename}-{methsize} not .key')
-                        continue
+                    has_key_prim = '.key' in methsubs[0]
 
-                    key_stream = StreamOptions.from_str(methsubs[0])
-                    has_plain = len(methsubs) > 1 and 'inp.' in methsubs[1]
-                    plain_type = methsubs[1].split('.')[1] if has_plain else None
-                    plain_str = StreamOptions.ZERO
-                    if plain_type == 'ctr':
-                        plain_str = StreamOptions.CTR
-                    elif plain_type == 'rnd':
-                        plain_str = StreamOptions.RND
-                    elif has_plain:
-                        logger.error(f'Unknown plain type: {meth}')
-                        continue
+                    prim_stream = StreamOptions.from_str(methsubs[0])  # key_stream for .key, plaintext for inp
+                    has_plain_sec = len(methsubs) > 1 and 'inp.' in methsubs[1]
+
+                    sec_stream_type = methsubs[1].split('.')[1] if has_plain_sec else None
+                    sec_stream_str = StreamOptions.from_str(sec_stream_type) if sec_stream_type else None
+                    if sec_stream_str is None and has_key_prim:  # zero is default for col
+                        sec_stream_str = StreamOptions.ZERO
+                    if sec_stream_str is None and not has_key_prim:  # zero is default for default
+                        sec_stream_str = StreamOptions.RND
 
                     for rnd in sorted(list(specs[ftypename][methsize])):
-                        agg_scripts += generate_cfg_col(
-                            alg_type, funcname, size, cround=rnd,
-                            tv_size=erec.block_size, key_size=erec.key_size, iv_size=erec.iv_size,
-                            nexps=3, eprefix='PH4-SM-%02d-' % smidx,
-                            streams=key_stream, inp_stream=plain_str)
+                        if has_key_prim:
+                            agg_scripts += generate_cfg_col(
+                                alg_type, funcname, size, cround=rnd,
+                                tv_size=erec.block_size, key_size=erec.key_size, iv_size=erec.iv_size,
+                                nexps=3, eprefix=eprefix,
+                                streams=prim_stream, inp_stream=sec_stream_str)
+                        else:
+                            agg_scripts += generate_cfg_inp(
+                                alg_type, funcname, size, cround=rnd,
+                                tv_size=erec.block_size, key_size=erec.key_size, iv_size=erec.iv_size,
+                                nexps=3, eprefix=eprefix,
+                                streams=prim_stream, key_stream=sec_stream_str
+                            )
 
         logger.info('Writing submit file')
         agg_filtered = []

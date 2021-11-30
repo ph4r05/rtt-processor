@@ -218,6 +218,8 @@ class StreamOptions:
             return StreamOptions.RND
         elif 'zero' in x:
             return StreamOptions.ZERO
+        else:
+            raise ValueError(f'Unknown generator: {x}')
 
 
 @lru_cache(maxsize=1024)
