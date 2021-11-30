@@ -909,7 +909,7 @@ class Loader:
         return ei
 
     def break_exp_ph4(self, s):
-        m = re.match(r'^PH4-SM-[\d]+-([\w-]+?)-t:([\w]+?)-r:([\w]+?)-b:([\w]+?)-s:([\w]+?)-e:([\w]+?)-i:([\w]+(:?\.key)?)-(.+?)?$', s)
+        m = re.match(r'^PH4-SM-[\d]+-([\w-]+?)-t:([\w]+?)-r:([\w]+?)-b:([\w]+?)-s:([\w]+?)-e:([\w]+?)-i:([\w.]+)-(.+?)?$', s)
         if m is None:
             return ExpInfo()
 
@@ -920,6 +920,8 @@ class Loader:
             psize = 1024*1024*100
         elif psize == '1000MiB':
             psize = 1024*1024*1024
+        else:
+            psize = 1024*1024 * int(psize.replace('MiB', '').replace('MB', ''))
 
         rc = m.group(3)
         ei = ExpInfo(eid=int(m.group(6)), meth=m.group(7), seed=None, osize=psize, size=psize,
