@@ -1259,7 +1259,7 @@ def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=None, key
         else:
             tpl['stream']['plaintext'] = inp_config
             tpl['stream']['key_size'] = key_size
-            tpl['stream']['key'] = get_single_stream(key_stream, bsize=key_size, offset=0, tv_count=1),  # no re-keying
+            tpl['stream']['key'] = get_single_stream(key_stream, bsize=key_size, offset=0, tv_count=1)  # no re-keying
             tpl['stream']['iv_size'] = iv_size
             tpl['stream']['iv'] = {
                 "type": "false_stream"
