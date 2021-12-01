@@ -28,7 +28,7 @@ class FuncInfo:
         return get_alg_type(self.ftype, self.stype)
 
     def __repr__(self):
-        return f'FuncInfo({self.fname}, {self.ftype}, {self.stype}, {self.max_rounds})'
+        return f'FuncInfo({self.fname}, ft: {self.ftype}, st: {self.stype}, r: {self.max_rounds})'
 
     @staticmethod
     def from_str(x):

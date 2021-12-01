@@ -769,7 +769,7 @@ class Cleaner:
                 fh.write(f"echo '{ix}/{len(file_names)}'\n")
                 fh.write(f"submit_experiment --all_batteries --name '{nname}' --cfg '/home/debian/rtt-home/RTTWebInterface/media/predefined_configurations/{ssize}MB.json' {ptype} '{fname}'\n")
 
-    def comp_new_rounds_new(self, specs, tmpdir='/tmp/rspecs', smidx=5, skip_existing_since=None,
+    def comp_new_rounds_new(self, specs, tmpdir='/tmp/rspecs', smidx=5, skip_existing_since=None, new_size=None,
                             clean_before=False):
         """
         Generates submit_experiment for a new rounds to compute.
@@ -798,9 +798,20 @@ class Cleaner:
                     logger.info(f'Skipping unsupported {ftypename}')
                     continue
 
+                new_size_used = set()
                 for methsize in specs[ftypename].keys():
                     meth_parts = methsize.split(':')
-                    meth, size = meth_parts[0], int(meth_parts[1])
+                    if len(meth_parts) > 2:
+                        logger.info(f'Skipping unsupported method {ftypename} for {methsize}')
+                        continue
+
+                    meth, size = meth_parts[0], int(meth_parts[-1])
+                    if new_size is not None:
+                        meth_base = ':'.join(meth_parts[:-1])
+                        if meth_base in new_size_used:
+                            continue
+                        size = new_size
+                        new_size_used.add(meth_base)
 
                     methsubs = meth.split('..')
                     has_key_prim = '.key' in methsubs[0]
@@ -815,20 +826,28 @@ class Cleaner:
                     if sec_stream_str is None and not has_key_prim:  # zero is default for default
                         sec_stream_str = StreamOptions.RND
 
-                    for rnd in sorted(list(specs[ftypename][methsize])):
-                        if has_key_prim:
-                            agg_scripts += generate_cfg_col(
-                                alg_type, funcname, size, cround=rnd,
-                                tv_size=erec.block_size, key_size=erec.key_size, iv_size=erec.iv_size,
-                                nexps=3, eprefix=eprefix,
-                                streams=prim_stream, inp_stream=sec_stream_str)
-                        else:
-                            agg_scripts += generate_cfg_inp(
-                                alg_type, funcname, size, cround=rnd,
-                                tv_size=erec.block_size, key_size=erec.key_size, iv_size=erec.iv_size,
-                                nexps=3, eprefix=eprefix,
-                                streams=prim_stream, key_stream=sec_stream_str
-                            )
+                    rnd_info = specs[ftypename][methsize]
+                    if isinstance(rnd_info, (list, tuple)) and len(rnd_info) == 2 and isinstance(rnd_info[1], (list, tuple)):
+                        rnd_info = rnd_info[1]
+
+                    for rnd in sorted(list(rnd_info)):
+                        try:
+                            if has_key_prim:
+                                agg_scripts += generate_cfg_col(
+                                    alg_type, funcname, size, cround=rnd,
+                                    tv_size=erec.block_size, key_size=erec.key_size, iv_size=erec.iv_size,
+                                    nexps=3, eprefix=eprefix,
+                                    streams=prim_stream, inp_stream=sec_stream_str)
+                            else:
+                                agg_scripts += generate_cfg_inp(
+                                    alg_type, funcname, size, cround=rnd,
+                                    tv_size=erec.block_size, key_size=erec.key_size, iv_size=erec.iv_size,
+                                    nexps=3, eprefix=eprefix,
+                                    streams=prim_stream, key_stream=sec_stream_str)
+
+                        except Exception as e:
+                            logger.warning(f'Error in processing: {alg_type}:{funcname}:{size}:{rnd} {erec}, {methsize} err: {e}')
+                            continue
 
         logger.info('Writing submit file')
         agg_filtered = []
