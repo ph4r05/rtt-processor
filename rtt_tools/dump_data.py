@@ -919,7 +919,7 @@ class Loader:
         elif psize == '100MiB':
             psize = 1024*1024*100
         elif psize == '1000MiB':
-            psize = 1024*1024*1024
+            psize = 1024*1024*1000
         else:
             psize = 1024*1024 * int(psize.replace('MiB', '').replace('MB', ''))
 
