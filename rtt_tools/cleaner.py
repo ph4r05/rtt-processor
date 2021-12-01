@@ -14,6 +14,7 @@ import itertools
 import collections
 import json
 import argparse
+import random
 from typing import Optional, List, Dict, Tuple, Union, Any, Sequence, Iterable, Collection
 
 from rtt_tools.generator_mpc import get_input_key, get_input_size, comp_hw_weight, make_hw_config, HwConfig, \
@@ -405,6 +406,8 @@ class Cleaner:
                 if 'stream:cipher' in name:
                     renames.append((eid, name))
 
+            logger.info(f'Renames to exec: {len(renames)}')
+            random.shuffle(renames)
             for eid, name in renames:
                 nname = name.replace('stream:cipher', 'stream_cipher')
 
@@ -413,8 +416,7 @@ class Cleaner:
                 try_execute(lambda: c.execute(sql_exps, (nname, eid,)),
                             msg="Update experiment with ID %s" % eid)
 
-                self.conn.commit()
-            logger.info('Experiment %s solved' % (eid,))
+            self.conn.commit()
 
     def fix_underscores(self):
         with self.conn.cursor() as c:
@@ -442,7 +444,6 @@ class Cleaner:
                             msg="Update experiment with ID %s" % eid)
 
             self.conn.commit()
-            logger.info('Experiment %s solved' % (eid,))
 
     def fix_lowmc(self):
         with self.conn.cursor() as c:
@@ -470,6 +471,29 @@ class Cleaner:
 
             self.conn.commit()
             logger.info('Experiment %s solved' % (eid,))
+
+    def fix_tangle(self):
+        with self.conn.cursor() as c:
+            logger.info("Processing experiments")
+
+            c.execute("""SELECT e.id, name
+                            FROM experiments e
+                            JOIN rtt_data_providers dp ON e.data_file_id = dp.id
+                            WHERE e.id >= %s and name LIKE '%%Tangle%%ctr.key%%'
+                              """ % (self.exp_id_low,))
+
+            renames = []
+            for result in c.fetchall():
+                eid, name = result[0], result[1]
+                renames.append((eid, name, name.replace('ctr.key', 'ctr')))
+
+            for eid, oname, nname in renames:
+                sql_exps = 'UPDATE experiments SET name=%s WHERE id=%s'
+                print(f'Updating {eid} to {nname}')
+                try_execute(lambda: c.execute(sql_exps, (nname, eid,)),
+                            msg="Update experiment with ID %s" % eid)
+
+            self.conn.commit()
 
     def fix_1000MB(self, from_id=None, exp_count=3):
         with self.conn.cursor() as c:
