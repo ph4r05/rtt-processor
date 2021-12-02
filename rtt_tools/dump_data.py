@@ -820,10 +820,12 @@ class Loader:
                             help='Experiment IDs numbers to load')
         parser.add_argument('--is-secmargins', dest='is_secmargins', type=int, default=1,
                             help='Flag for security margins experiment')
-        parser.add_argument('--is-ph4-sm', dest='is_ph4_sm', type=int, default=1,
+        parser.add_argument('--is-ph4-sm', dest='is_ph4_sm', type=int, default=0,
                             help='Flag for PH4-SM experiment')
-        parser.add_argument('--is-ph4-mpc', dest='is_ph4_mpc', type=int, default=1,
+        parser.add_argument('--is-ph4-mpc', dest='is_ph4_mpc', type=int, default=0,
                             help='Flag for PH4-MPC experiment')
+        parser.add_argument('--is-ph4-ref', dest='is_ph4_ref', type=int, default=0,
+                            help='Flag for PH-SMREF- experiment')
 
         self.args, unparsed = parser.parse_known_args()
         logger.debug("Unparsed: %s" % unparsed)
@@ -967,6 +969,19 @@ class Loader:
                      fnc_type=None,
                      spread=m.group(10),
                      otype=otype)
+        return ei
+
+    def break_exp_ph4_aes_ref(self, s):
+        m = re.match(r'^PH4?-SMREF-([\d]+)-aes10-randctr-seed-([\w]+)\b.*$', s)
+        if m is None:
+            return ExpInfo()
+
+        # Constant for this experiment
+        psize = 1024*1024*100
+        ei = ExpInfo(eid=int(m.group(1)), meth='ctr', seed=m.group(2), osize=psize, size=psize,
+                     fnc='AES', fnc_name='AES',
+                     fnc_round=10,
+                     fnc_block=16)
         return ei
 
     def queue_summary(self):
@@ -1157,6 +1172,10 @@ class Loader:
                 logger.info('Loading ph4-sm-mpc experiments ')
                 wheres.append("name LIKE 'testmpc%%'")
 
+            if self.args.is_ph4_ref:
+                logger.info('Loading ph4-sm-ref experiments ')
+                wheres.append("name LIKE 'PH-SMREF-%%'")
+
             if wheres:
                 sel_sql = "%s WHERE %s" % (select_prefix, " OR ".join(wheres))
                 logger.info('Selection SQL: %s' % (sel_sql, ))
@@ -1179,6 +1198,7 @@ class Loader:
             is_sm = self.args.is_secmargins
             is_ph4_sm = self.args.is_ph4_sm
             is_ph4_mpc = self.args.is_ph4_mpc
+            is_ph4_ref = self.args.is_ph4_ref
             no_file_sizes = []
 
             for result in c.fetchall():  # break_exp_ph4
@@ -1193,6 +1213,8 @@ class Loader:
                     exp_info = self.break_exp_ph4(name)
                 if is_ph4_mpc and (exp_info is None or exp_info.fnc is None):
                     exp_info = self.break_exp_ph4_mpc(name)
+                if is_ph4_ref and (exp_info is None or exp_info.fnc is None):
+                    exp_info = self.break_exp_ph4_aes_ref(name)
 
                 if (is_sm or is_ph4_sm) and len(wanted_exps) > 0 and exp_info.id not in wanted_exps:
                     continue
