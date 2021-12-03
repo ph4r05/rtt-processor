@@ -1247,6 +1247,7 @@ def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=None, key
                 "algorithm": algorithm,
                 "round": cround,
                 "block_size": tv_size,
+                "init_frequency": "only_once",
             },
             "note": note
         }
