@@ -532,6 +532,7 @@ class Cleaner:
     def _name_find(self, nname_find):
         nname_find = re.sub(r'^PH4-SM-([\d]+)-', '', nname_find)
         nname_find = re.sub(r'^testmpc([\d]+)-', '', nname_find)
+        nname_find = re.sub(r'-i:(.+?)-.*$', '-i:\\1', nname_find)  # drop inp detailed specs
         return nname_find
 
     def _load_existing_exps(self, c, skip_existing_since):
