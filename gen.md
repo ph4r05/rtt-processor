@@ -419,3 +419,69 @@ rr += list(itertools.chain.from_iterable(
 
 g.write_submit_obj(rr)
 ```
+
+# Block cols - test
+
+```python
+import os, shutil, itertools
+from rtt_tools import generator_mpc as g
+dname = '/tmp/ggen30'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]
+
+rr += g.generate_stream_col('RC4', 10*1024*1024, 1, eprefix='PH4-SM-25-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
+rr += g.generate_cfg_inp('stream_cipher', 'RC4', 10*1024*1024, 1, eprefix='PH4-SM-25-', streams=g.StreamOptions.CTR_LHW_SAC_RND)
+rr += g.generate_cfg_inp('stream_cipher', 'RC4', 10*1024*1024, 1, eprefix='PH4-SM-25-', streams=g.StreamOptions.CTR_LHW_SAC_RND, key_stream=g.StreamOptions.CTR)
+rr += g.generate_cfg_inp('block', 'AES', 10*1024*1024, 1, eprefix='PH4-SM-25-', streams=g.StreamOptions.CTR_LHW_SAC_RND, key_stream=g.StreamOptions.CTR)
+rr += g.generate_cfg_inp('hash', 'MD5', 10*1024*1024, 1, eprefix='PH4-SM-25-', streams=g.StreamOptions.CTR_LHW_SAC_RND, key_stream=g.StreamOptions.CTR)
+rr += g.generate_cfg_inp('hash', 'SHA3', 10*1024*1024, 1, eprefix='PH4-SM-25-', streams=g.StreamOptions.CTR_LHW_SAC_RND, key_stream=g.StreamOptions.CTR)
+
+g.write_submit_obj(rr)
+```
+
+
+# Tangle top
+
+```python
+import os, shutil, itertools
+from rtt_tools import generator_mpc as g
+dname = '/tmp/ggen33'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]
+
+rr += list(itertools.chain.from_iterable(
+    [g.generate_hash_inp('Tangle', 100*1024*1024, r, 32, None, None, eprefix='PH4-SM-25-', streams=g.StreamOptions.CTR) for r in range(64, 81)]))
+
+g.write_submit_obj(rr)
+```
+
+# PRNGs
+
+```python
+import os, shutil, itertools
+from rtt_tools import generator_mpc as g
+dname = '/tmp/ggen39'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]
+
+tv_sizes = [32]
+osizes = [10*1024*1024, 100*1024*1024, 1000*1024*1024]
+prngs = ['std_mersenne_twister', 'std_lcg', 'std_subtract_with_carry', 'testu01-ulcg', 'testu01-umrg', 'testu01-uxorshift']
+
+# zero input, random key, whole stream
+kwargs = {'eprefix': 'PH4-SM-39-', 'streams': g.StreamOptions.ZERO, 'key_stream': g.StreamOptions.RND}
+for fname, tv_size, osize in itertools.product(prngs, tv_sizes, osizes):
+    rr += g.generate_prng_inp(fname, osize, cround=0, tv_size=tv_size, **kwargs)
+    
+# Re-key with each TV
+tv_sizes = [16, 32, 128, 1024, 8192]
+kwargs = {'eprefix': 'PH4-SM-39-', 'streams': g.StreamOptions.CTR_LHW_SAC_RND}
+for fname, tv_size, osize in itertools.product(prngs, tv_sizes, osizes):
+    rr += g.generate_prng_col(fname, osize, cround=0, tv_size=tv_size, **kwargs)
+
+g.write_submit_obj(rr)
+```
+
