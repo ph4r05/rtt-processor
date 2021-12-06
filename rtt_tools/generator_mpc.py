@@ -48,7 +48,7 @@ MODULI = {
     'Bin255': 2**255,
 }
 
-# Input lengths for PRNGs
+# Seed lengths for PRNGs
 ILENS = {
     'std_mersenne_twister': 4,
     'std_lcg': 4,
@@ -330,8 +330,18 @@ def make_ctr_config(blen=31, offset='00', tv_count=None, min_data=None, core_onl
         raise ValueError('Offset has to be hex-coded byte')
 
     if max_vals < tv_count:
-        logger.info('TV count is higher than ctr space %s bits, max vals: %s'
-                    % (blen-1, max_vals))
+        # Recompute offset so it is in the higher MSB part
+        int_off = int(offset, 16)
+        if int_off < 8:
+            logger.info('CTR counter size too small %sb, trying to recompute offset to MSB' % (blen - 1, ))
+            offset = int_to_hex(int_off << 5, 1)
+            max_vals = 2 ** ((blen - 1) * 8 + 5) - 1
+            tv_count = min(tv_count or max_vals, 2 ** 62)
+            data_mb = blen * tv_count / 1024 / 1024
+
+    if max_vals < tv_count:
+        logger.info('TV count is higher than ctr space %s bits, max vals: %s, desired: %s'
+                    % (blen-1, max_vals, tv_count))
 
     if min_data is not None and min_data > blen * min(max_vals, tv_count):
         raise ValueError('Condition on minimal data could not be fulfilled')
@@ -1086,7 +1096,7 @@ def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=None, key
     is_stream = alg_type == 'stream_cipher'
     is_prng = alg_type == 'prng'
 
-    if tv_size is None or (key_size is None and (is_block or is_stream)):
+    if tv_size is None or (key_size is None and (is_block or is_stream or is_prng)):
         ftype = FuncInfo.from_str(alg_type)
         erec = FUNC_DB.search(algorithm, ftype)
         if erec is None:
@@ -1103,6 +1113,9 @@ def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=None, key
 
     if not is_block and not is_stream and not is_prng:
         raise ValueError('Unknown alg type: %s' % (alg_type,))
+
+    if is_prng and inp_stream != StreamOptions.ZERO:
+        raise ValueError('PRNG supports only zero input stream')
 
     aux_inp_spec = ''
     if StreamOptions.has_ctr(inp_stream):
@@ -1200,7 +1213,7 @@ def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=None, key
     if not is_block and not is_stream and not is_prng and not is_hash:
         raise ValueError('Unknown alg type: %s' % (alg_type,))
 
-    if tv_size is None or (key_size is None and (is_block or is_stream)):
+    if tv_size is None or (key_size is None and (is_block or is_stream or is_prng)):
         ftype = FuncInfo.from_str(alg_type)
         erec = FUNC_DB.search(algorithm, ftype)
         if erec is None:
@@ -1208,6 +1221,9 @@ def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=None, key
         tv_size = tv_size if tv_size else erec.block_size
         key_size = key_size if key_size else erec.key_size
         iv_size = iv_size if iv_size else erec.iv_size
+
+    if is_prng and streams != StreamOptions.ZERO:
+        raise ValueError('PRNG does not allow input stream other than zero')
 
     iv_size = iv_size or 0
     tv_count = int(math.ceil(data_size / tv_size))
@@ -1261,8 +1277,8 @@ def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=None, key
             tpl['stream'] = {
                 "type": "prng",
                 "algorithm": algorithm,
-                "reseed_for_each_test_vector": True,
-                "seeder": inp_config
+                "reseed_for_each_test_vector": False,
+                "seeder": get_single_stream(key_stream, bsize=key_size, offset=0, tv_count=1)
             }
 
         else:
