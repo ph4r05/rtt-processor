@@ -341,7 +341,7 @@ class Cleaner:
 
                 if 'init_frequency' in config_js['stream']:
                     continue
-                if config_js['stream']['type'] in ['hash', 'prng']:
+                if config_js['stream']['type'] != 'block':
                     continue
 
                 if pid not in reconfigured:
