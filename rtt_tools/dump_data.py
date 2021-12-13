@@ -1354,17 +1354,29 @@ class Loader:
                     bat2exp[bt.id] = bt.exp_id
 
             # Load all tests for all batteries
+            battery_chunk = 20
+            last_pcnt = 0
+            tstart = time.time()
+
             bids = sorted(list(bat2exp.keys()))
             bidsmap = {x.id: x for x in self.batteries.values()}
             logger.info("Loading all tests, len: %s" % len(bids))
 
-            for bs in chunks(bids, 20):
+            for ix, bs in enumerate(chunks(bids, battery_chunk)):
                 c.execute("""
                                 SELECT * FROM tests 
                                 WHERE battery_id IN (%s)
                             """ % ','.join([str(x) for x in bs]))
 
                 for r in c.fetchall():
+                    pcnt_done = 100 * ix/(len(bids)/20)
+                    if int(pcnt_done) > last_pcnt:
+                        last_pcnt = int(pcnt_done)
+                        elapsed = time.time() - tstart
+                        remaining = (elapsed / last_pcnt) * (100 - last_pcnt)
+                        logger.info("Test batch %5d / %6d (%.3f %%), elapsed: %.2f m, remaining eta: %.2f m:"
+                                    % (ix, len(bids)/20, pcnt_done, elapsed / 60, remaining / 60))
+
                     self.new_test(r[1])
                     tt = Test(r[0], r[1], r[2], r[3] == 'passed', r[4], r[5])
                     tt.battery = bidsmap[tt.battery_id]
