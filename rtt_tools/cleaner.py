@@ -318,6 +318,33 @@ class Cleaner:
 
             self.conn.commit()
 
+    def outphase_old_prngs(self, from_id=None):
+        """Remove old PRNGs experiments"""
+        with self.conn.cursor() as c:
+            logger.info("Processing experiments")
+            sql_sel = """SELECT e.id, name, dp.`provider_config`, dp.provider_name, dp.id, dp.provider_config_name
+                            FROM experiments e
+                            JOIN rtt_data_providers dp ON e.data_file_id = dp.id
+                            WHERE e.id >= %s AND e.id < 339060
+                            AND name LIKE 'PH4-SM%%' AND name LIKE '%%t:prng%%'                            
+                      """ % (from_id,)
+            logger.info('SQL: %s' % sql_sel)
+            c.execute(sql_sel)
+
+            renames = []
+            for result in c.fetchall():
+                eid, name = result[0], result[1]
+                renames.append((eid, name))
+
+            for eid, name in renames:
+                nname = 'SUSP-%s' % name
+
+                sql_exps = 'UPDATE experiments SET name=%s WHERE id=%s'
+                print(f'Updating {eid} to {nname}')
+                try_execute(lambda: c.execute(sql_exps, (nname, eid,)),
+                            msg="Update experiment with ID %s" % eid)
+            self.conn.commit()
+
     def fix_init_freq(self, from_id=None):
         """Some experiments did not have init_frequency field, has to be added"""
         with self.conn.cursor() as c:
