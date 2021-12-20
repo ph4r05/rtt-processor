@@ -859,7 +859,8 @@ def gen_lowmc(data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW):
     return gen_lowmc_core(to_gen, data_sizes, eprefix, streams)
 
 
-def gen_lowmc_core(to_gen, data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW):
+def gen_lowmc_core(to_gen, data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW,
+                   use_as_key=False, other_stream=None):
     data_sizes = data_sizes or [100 * 1024 * 1024]
     full_tpl = '{{CRYPTOSTREAMS_BIN}} -c={{FILE_CONFIG1.JSON}}'
 
@@ -894,13 +895,21 @@ def gen_lowmc_core(to_gen, data_sizes=None, eprefix=None, streams=StreamOptions.
         ] if StreamOptions.has_lhw(streams) else []
 
         sac_configs = [
-            ('sac00-b%s' % inp_block_bytes, {'type': 'sac'}, '0000000000000006'),
-            ('sac01-b%s' % inp_block_bytes, {'type': 'sac'}, '0000000000000007'),
-            ('sac02-b%s' % inp_block_bytes, {'type': 'sac'}, '0000000000000008'),
+            ('sac00-b%s' % inp_block_bytes, {'stream': {'type': 'sac'}}, '0000000000000006'),
+            ('sac01-b%s' % inp_block_bytes, {'stream': {'type': 'sac'}}, '0000000000000007'),
+            ('sac02-b%s' % inp_block_bytes, {'stream': {'type': 'sac'}}, '0000000000000008'),
         ] if StreamOptions.has_sac(streams) else []
 
-        agg_inputs = ctr_configs + hw_configs + sac_configs
+        rnd_configs = [
+            ('rnd00-b%s' % inp_block_bytes, {'stream': get_single_stream(StreamOptions.RND)}, '0000000000000009'),
+            ('rnd01-b%s' % inp_block_bytes, {'stream': get_single_stream(StreamOptions.RND)}, '000000000000000a'),
+            ('rnd02-b%s' % inp_block_bytes, {'stream': get_single_stream(StreamOptions.RND)}, '000000000000000b'),
+        ] if StreamOptions.has_rnd(streams) else []
+
+        agg_inputs = ctr_configs + hw_configs + sac_configs + rnd_configs
         agg_spreads = [('', None)]  # get_binary_strategies(moduli_bits, out_block_bits, max_out_b)
+
+        other_stream = get_single_stream(StreamOptions.RND) if not use_as_key else get_single_stream(StreamOptions.ZERO)
 
         for configs in itertools.product(agg_spreads, agg_inputs):
             inp_name = configs[1][0]
@@ -910,24 +919,27 @@ def gen_lowmc_core(to_gen, data_sizes=None, eprefix=None, streams=StreamOptions.
             inp = configs[1][1]
             cfull_tpl = full_tpl
 
+            inp_mod = '' if not use_as_key else 'key.'
+            input_stream = inp['stream'] if not use_as_key else other_stream
+            key_stream = other_stream if not use_as_key else inp['stream']
+
             agg_configs.append((inp, cfull_tpl))
-            ename = '%s%s-%s-raw-r%s-inp-%s-spr-%s-s%sMB' \
+            ename = '%s%s-%s-raw-r%s-inp-%s%s-spr-%s-s%sMB' \
                     % (eprefix or '', cpos[0], 'bin',
-                       cpos[2], inp_name, spread_name, int(max_out / 1024 / 1024))
+                       cpos[2], inp_mod, inp_name, spread_name, int(max_out / 1024 / 1024))
+            notes = inp['notes'] if 'notes' in inp else ename
 
             lowmc_cfg = {
                 "type": "block",
-                "init_frequency": "only_once",
+                "init_frequency": "only_once" if not use_as_key else "1",
                 "algorithm": "LOWMC",
                 "round": cround,
                 "block_size": inp_block_bytes,
                 "block_size_bits": inp_block_bytes * 8,
                 "key_size_bits": key_size * 8,
-                "plaintext": inp['stream'],
+                "plaintext": input_stream,
                 "key_size": key_size,
-                "key": {
-                    "type": "pcg32_stream"
-                },
+                "key": key_stream,
                 "iv_size": key_size,
                 "iv": {
                     "type": "false_stream"
@@ -945,7 +957,7 @@ def gen_lowmc_core(to_gen, data_sizes=None, eprefix=None, streams=StreamOptions.
                 },
                 "input_files": {
                     "CONFIG1.JSON": {
-                        "note": inp['notes'],
+                        "note": notes,
                         "data": {
                             "notes": ename,
                             "seed": seed,
