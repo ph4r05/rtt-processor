@@ -476,6 +476,19 @@ def make_hw_core(offset, weight):
     }
 
 
+def make_basic_config(blen, tv_count, stream=None, seed=None):
+    return {
+        "seed": seed or "0000000000000000",
+        "tv-size": None,
+        "tv-count": None,
+        "tv_size": blen,
+        "tv_count": tv_count,
+        "stdout": True,
+        "file_name": "unused.bin",
+        "stream": stream
+    }
+
+
 def get_strategy_prime(modulus, ob, ib=256, st=6, max_out=None, seed=None):
     """
     Generate spreader strategy command for prime fields
@@ -579,7 +592,7 @@ def augment_round_configs(to_gen):
     return res
 
 
-def gen_posseidon(data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW):
+def gen_posseidon(data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW, **kwargs):
     rstsr = '--rf 2 --rp 0 --red-rf1 %s --red-rf2 %s --red-rp %s'
 
     # fname, field name, rounds structure, sage file, round string, rounds to test
@@ -592,10 +605,10 @@ def gen_posseidon(data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW):
         # ('Poseidon_S128e', 'F253', (8, 85), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
         ('Poseidon_S128_BLS12_138', 'F_QBLS12_381', (8, 60), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
     ]
-    return gen_prime_config(to_gen, data_sizes, eprefix=eprefix, streams=streams)
+    return gen_prime_config(to_gen, data_sizes, eprefix=eprefix, streams=streams, **kwargs)
 
 
-def gen_starkad(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW):
+def gen_starkad(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW, **kwargs):
     rstsr = '--rf 2 --rp 0 --red-rf1 %s --red-rf2 %s --red-rp %s'
 
     # fname, field name, rounds structure, sage file, round string, rounds to test
@@ -607,10 +620,10 @@ def gen_starkad(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOption
         # ('Starkad_S128d', 'Bin63', (8, 43), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
         ('Starkad_S128e', 'Bin255', (8, 88), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
     ]
-    return gen_binary_config(to_gen, data_sizes, eprefix=eprefix, streams=streams)
+    return gen_binary_config(to_gen, data_sizes, eprefix=eprefix, streams=streams, **kwargs)
 
 
-def gen_rescue(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW):
+def gen_rescue(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW, **kwargs):
     rstsr = '-r %s'
 
     # fname, field name, rounds structure, sage file, round string, rounds to test
@@ -623,10 +636,10 @@ def gen_rescue(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions
         # ('Rescue_S128b', 'F253', (22,), 'vision.sage', rstsr, [(1,), (2,)]),
         ('Rescue_S128e', 'F253', (10,), 'vision.sage', rstsr, [(1,), (2,)]),
     ]
-    return gen_prime_config(to_gen, data_sizes, eprefix=eprefix, streams=streams)
+    return gen_prime_config(to_gen, data_sizes, eprefix=eprefix, streams=streams, **kwargs)
 
 
-def gen_vision(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW):
+def gen_vision(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW, **kwargs):
     rstsr = '-r %s'
 
     # fname, field name, rounds structure, sage file, round string, rounds to test
@@ -639,10 +652,10 @@ def gen_vision(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions
         # ('Vision_S128b', 'Bin255', (26,), 'vision.sage', rstsr, [(1,), (2,)]),
         ('Vision_S128d', 'Bin63', (10,), 'vision.sage', rstsr, [(1,), (2,)]),
     ]
-    return gen_binary_config(to_gen, data_sizes, eprefix=eprefix, streams=streams)
+    return gen_binary_config(to_gen, data_sizes, eprefix=eprefix, streams=streams, **kwargs)
 
 
-def gen_gmimc(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW):
+def gen_gmimc(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW, **kwargs):
     rstsr = '-r %s'
 
     # fname, field name, rounds structure, sage file, round string, rounds to test
@@ -654,10 +667,10 @@ def gen_gmimc(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.
         # ('S128a', 'F125', (166,), 'gmimc.sage', rstsr, [(1,), (2,)]),
         ('S128e', 'F253', (342,), 'gmimc.sage', rstsr, [(1,), (2,)]),
     ]
-    return gen_prime_config(to_gen, data_sizes, eprefix=eprefix, streams=streams)
+    return gen_prime_config(to_gen, data_sizes, eprefix=eprefix, streams=streams, **kwargs)
 
 
-def gen_mimc(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW):
+def gen_mimc(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW, **kwargs):
     rstsr = '-r %s'
 
     # fname, field name, rounds structure, sage file, round string, rounds to test
@@ -666,17 +679,17 @@ def gen_mimc(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.C
         ('S80', 'F161', (204,), 'mimc_hash.sage', rstsr, [(1,), (2,)]),
         ('S128', 'F253', (320,), 'mimc_hash.sage', rstsr, [(1,), (2,)]),
     ]
-    return gen_prime_config(to_gen, data_sizes, eprefix=eprefix, streams=streams)
+    return gen_prime_config(to_gen, data_sizes, eprefix=eprefix, streams=streams, **kwargs)
 
 
-def gen_all(data_sizes=None, eprefix=None):
-    return gen_posseidon(data_sizes, eprefix) \
-           + gen_starkad(data_sizes, eprefix) \
-           + gen_rescue(data_sizes, eprefix) \
-           + gen_vision(data_sizes, eprefix) \
-           + gen_gmimc(data_sizes, eprefix) \
-           + gen_mimc(data_sizes, eprefix) \
-           + gen_lowmc(data_sizes, eprefix)
+def gen_all(data_sizes=None, eprefix=None, **kwargs):
+    return gen_posseidon(data_sizes, eprefix, **kwargs) \
+           + gen_starkad(data_sizes, eprefix, **kwargs) \
+           + gen_rescue(data_sizes, eprefix, **kwargs) \
+           + gen_vision(data_sizes, eprefix, **kwargs) \
+           + gen_gmimc(data_sizes, eprefix, **kwargs) \
+           + gen_mimc(data_sizes, eprefix, **kwargs) \
+           + gen_lowmc(data_sizes, eprefix, **kwargs)
 
 
 def get_prime_strategies(moduli, moduli_bits, out_block_bits, max_out_b):
@@ -730,12 +743,12 @@ def get_binary_accepting_ratio():
     return 1
 
 
-def gen_prime_config(to_gen, data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW):
-    return gen_script_config(to_gen, True, data_sizes=data_sizes, eprefix=eprefix, streams=streams)
+def gen_prime_config(to_gen, data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW, **kwargs):
+    return gen_script_config(to_gen, True, data_sizes=data_sizes, eprefix=eprefix, streams=streams, **kwargs)
 
 
-def gen_binary_config(to_gen, data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW):
-    return gen_script_config(to_gen, False, data_sizes=data_sizes, eprefix=eprefix, streams=streams)
+def gen_binary_config(to_gen, data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW, **kwargs):
+    return gen_script_config(to_gen, False, data_sizes=data_sizes, eprefix=eprefix, streams=streams, **kwargs)
 
 
 def myformat(_fmtstr, **kwargs):
@@ -744,7 +757,8 @@ def myformat(_fmtstr, **kwargs):
     return _fmtstr
 
 
-def gen_script_config(to_gen, is_prime=True, data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW):
+def gen_script_config(to_gen, is_prime=True, data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW,
+                      use_as_key=False, other_stream=None, **kwargs):
     data_sizes = data_sizes or [100 * 1024 * 1024]
 
     tpl = '{{SAGE_BIN}} {{RTT_EXEC}}/rtt-mpc/rtt_mpc/{{sfile}} ' \
@@ -802,7 +816,19 @@ def gen_script_config(to_gen, is_prime=True, data_sizes=None, eprefix=None, stre
             ('lhw02-b%s-w%s' % (inp_block_bytes, weight), make_hw_config(inp_block_bytes, weight=weight, offset_range=2/3., min_data=min_data)),
         ] if StreamOptions.has_lhw(streams) else []
 
-        agg_inputs = ctr_configs + hw_configs
+        sac_configs = [
+            ('sac00-b%s' % inp_block_bytes, get_single_stream(StreamOptions.SAC), '0000000000000006'),
+            ('sac01-b%s' % inp_block_bytes, get_single_stream(StreamOptions.SAC), '0000000000000007'),
+            ('sac02-b%s' % inp_block_bytes, get_single_stream(StreamOptions.SAC), '0000000000000008'),
+        ] if StreamOptions.has_sac(streams) else []
+
+        rnd_configs = [
+            ('rnd00-b%s' % inp_block_bytes, get_single_stream(StreamOptions.RND), '0000000000000009'),
+            ('rnd01-b%s' % inp_block_bytes, get_single_stream(StreamOptions.RND), '000000000000000a'),
+            ('rnd02-b%s' % inp_block_bytes, get_single_stream(StreamOptions.RND), '000000000000000b'),
+        ] if StreamOptions.has_rnd(streams) else []
+
+        agg_inputs = ctr_configs + hw_configs + sac_configs + rnd_configs
         agg_spreads = get_prime_strategies(moduli, moduli_bits, out_block_bits, max_out_b) if is_prime \
             else get_binary_strategies(moduli_bits, out_block_bits, max_out_b)
 
@@ -811,6 +837,7 @@ def gen_script_config(to_gen, is_prime=True, data_sizes=None, eprefix=None, stre
             spread_name = configs[0][0]
 
             inp = configs[1][1]
+            seed = configs[1][2]
             cfull_tpl = myformat(full_tpl,
                                  tpl=ctpl,
                                  spreader=configs[0][1]
@@ -820,6 +847,11 @@ def gen_script_config(to_gen, is_prime=True, data_sizes=None, eprefix=None, stre
             ename = '%s%s-%s-raw-r%s-inp-%s-spr-%s-s%sMB' \
                     % (eprefix or '', cpos[0], 'pri' if is_prime else 'bin',
                        '-'.join(map(str, cpos[5])), inp_name, spread_name, int(max_out/1024/1024))
+            notes = inp['notes'] if 'notes' in inp else ename
+
+            if 'seed' not in inp:
+                tv_count = int(math.ceil(min_data / inp_block_bytes))
+                inp = make_basic_config(inp_block_bytes, tv_count, inp, seed)
 
             script = {
               "stream": {
@@ -829,7 +861,7 @@ def gen_script_config(to_gen, is_prime=True, data_sizes=None, eprefix=None, stre
               },
               "input_files": {
                 "CONFIG1.JSON": {
-                  "note": inp['notes'],
+                  "note": notes,
                   "data": inp,
                 }
               }
