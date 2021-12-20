@@ -803,6 +803,7 @@ def gen_script_config(to_gen, is_prime=True, data_sizes=None, eprefix=None, stre
         if min_data < max_out or req_data < max_out:
             raise ValueError('Assertion error on min data')
 
+        # TODO: blen align to key size
         ctr_configs = [
             ('ctr00-b%s' % inp_block_bytes, make_ctr_config(inp_block_bytes, offset='00', min_data=min_data)),
             ('ctr01-b%s' % inp_block_bytes, make_ctr_config(inp_block_bytes, offset='01', min_data=min_data)),
@@ -909,33 +910,34 @@ def gen_lowmc_core(to_gen, data_sizes=None, eprefix=None, streams=StreamOptions.
         sboxes = LOWMC_PARAMS[cname].sboxes
         min_data = max_out
         tv_count = int(math.ceil(8*max_out / LOWMC_PARAMS[cname].block_size))
+        inp_blen = inp_block_bytes if not use_as_key else key_size
 
         ctr_configs = [
-            ('ctr00-b%s' % inp_block_bytes, make_ctr_config(inp_block_bytes, offset='00', min_data=min_data), '0000000000000000'),
-            ('ctr01-b%s' % inp_block_bytes, make_ctr_config(inp_block_bytes, offset='01', min_data=min_data), '0000000000000001'),
-            ('ctr02-b%s' % inp_block_bytes, make_ctr_config(inp_block_bytes, offset='02', min_data=min_data), '0000000000000002'),
+            ('ctr00-b%s' % inp_blen, make_ctr_config(inp_blen, offset='00', min_data=min_data), '0000000000000000'),
+            ('ctr01-b%s' % inp_blen, make_ctr_config(inp_blen, offset='01', min_data=min_data), '0000000000000001'),
+            ('ctr02-b%s' % inp_blen, make_ctr_config(inp_blen, offset='02', min_data=min_data), '0000000000000002'),
         ] if StreamOptions.has_ctr(streams) else []
 
-        weight = comp_hw_weight(inp_block_bytes, samples=3, min_data=min_data)
+        weight = comp_hw_weight(inp_blen, samples=3, min_data=min_data)
         hw_configs = [
-            ('lhw00-b%s-w%s' % (inp_block_bytes, weight),
-             make_hw_config(inp_block_bytes, weight=weight, offset_range=0.0, min_data=min_data), '0000000000000003'),
-            ('lhw01-b%s-w%s' % (inp_block_bytes, weight),
-             make_hw_config(inp_block_bytes, weight=weight, offset_range=1/3., min_data=min_data), '0000000000000004'),
-            ('lhw02-b%s-w%s' % (inp_block_bytes, weight),
-             make_hw_config(inp_block_bytes, weight=weight, offset_range=2/3., min_data=min_data), '0000000000000005'),
+            ('lhw00-b%s-w%s' % (inp_blen, weight),
+             make_hw_config(inp_blen, weight=weight, offset_range=0.0, min_data=min_data), '0000000000000003'),
+            ('lhw01-b%s-w%s' % (inp_blen, weight),
+             make_hw_config(inp_blen, weight=weight, offset_range=1/3., min_data=min_data), '0000000000000004'),
+            ('lhw02-b%s-w%s' % (inp_blen, weight),
+             make_hw_config(inp_blen, weight=weight, offset_range=2/3., min_data=min_data), '0000000000000005'),
         ] if StreamOptions.has_lhw(streams) else []
 
         sac_configs = [
-            ('sac00-b%s' % inp_block_bytes, {'stream': {'type': 'sac'}}, '0000000000000006'),
-            ('sac01-b%s' % inp_block_bytes, {'stream': {'type': 'sac'}}, '0000000000000007'),
-            ('sac02-b%s' % inp_block_bytes, {'stream': {'type': 'sac'}}, '0000000000000008'),
+            ('sac00-b%s' % inp_blen, {'stream': {'type': 'sac'}}, '0000000000000006'),
+            ('sac01-b%s' % inp_blen, {'stream': {'type': 'sac'}}, '0000000000000007'),
+            ('sac02-b%s' % inp_blen, {'stream': {'type': 'sac'}}, '0000000000000008'),
         ] if StreamOptions.has_sac(streams) else []
 
         rnd_configs = [
-            ('rnd00-b%s' % inp_block_bytes, {'stream': get_single_stream(StreamOptions.RND)}, '0000000000000009'),
-            ('rnd01-b%s' % inp_block_bytes, {'stream': get_single_stream(StreamOptions.RND)}, '000000000000000a'),
-            ('rnd02-b%s' % inp_block_bytes, {'stream': get_single_stream(StreamOptions.RND)}, '000000000000000b'),
+            ('rnd00-b%s' % inp_blen, {'stream': get_single_stream(StreamOptions.RND)}, '0000000000000009'),
+            ('rnd01-b%s' % inp_blen, {'stream': get_single_stream(StreamOptions.RND)}, '000000000000000a'),
+            ('rnd02-b%s' % inp_blen, {'stream': get_single_stream(StreamOptions.RND)}, '000000000000000b'),
         ] if StreamOptions.has_rnd(streams) else []
 
         agg_inputs = ctr_configs + hw_configs + sac_configs + rnd_configs
