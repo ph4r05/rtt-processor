@@ -19,7 +19,8 @@ import random
 from typing import Optional, List, Dict, Tuple, Union, Any, Sequence, Iterable, Collection
 
 from rtt_tools.generator_mpc import get_input_key, get_input_size, comp_hw_weight, make_hw_config, HwConfig, \
-    comb_cached, rank, HwSpaceTooSmall, generate_cfg_col, StreamOptions, ExpRec, write_submit_obj, generate_cfg_inp
+    comb_cached, rank, HwSpaceTooSmall, generate_cfg_col, StreamOptions, ExpRec, write_submit_obj, generate_cfg_inp, \
+    gen_lowmc_core, gen_script_config, MPC_SAGE_PARAMS
 from rtt_tools.gen.max_rounds import FUNC_DB, FuncDb, FuncInfo
 from rtt_tools.utils import natural_sort_key
 
@@ -747,7 +748,7 @@ class Cleaner:
                 fh.write(f"submit_experiment --all_batteries --name '{nname}' --cfg '/home/debian/rtt-home/RTTWebInterface/media/predefined_configurations/{ssize}MB.json' {ptype} '{fname}'\n")
 
     def comp_new_rounds_new(self, specs, tmpdir='/tmp/rspecs', smidx=5, skip_existing_since=None, new_size=None,
-                            clean_before=False):
+                            clean_before=False, randomize_seed=False):
         """
         Generates submit_experiment for a new rounds to compute.
         specs is: ftype:fname -> meth:size -> [rounds]
@@ -771,10 +772,20 @@ class Cleaner:
                     logger.info(f'Function {ftypename} not found')
                     continue
 
+                if erec.stype == FuncInfo.MPC:
+                    mpc_res = self.comp_mpc(erec, ftypename, specs[ftypename], eprefix, randomize_seed)
+                    if mpc_res:
+                        agg_scripts += mpc_res
+                    continue
+
                 try:
                     alg_type = erec.get_alg_type()
                 except:
-                    logger.info(f'Skipping unsupported {ftypename}')
+                    logger.info(f'Skipping unsupported {ftypename}, specs: {specs[ftypename]}')
+                    continue
+
+                if alg_type == 'prng':
+                    logger.info(f'Skipping unsupported PRNG {ftypename}, specs: {specs[ftypename]}')
                     continue
 
                 new_size_used = set()
@@ -798,7 +809,7 @@ class Cleaner:
                     prim_stream = StreamOptions.from_str(methsubs[0])  # key_stream for .key, plaintext for inp
                     has_plain_sec = len(methsubs) > 1 and '.inp' in methsubs[1]
 
-                    sec_stream_type = methsubs[1].split('.')[1] if has_plain_sec else None
+                    sec_stream_type = methsubs[1].split('.')[0] if has_plain_sec else None
                     sec_stream_str = StreamOptions.from_str(sec_stream_type) if sec_stream_type else None
                     if sec_stream_str is None and has_key_prim:  # zero is default for col
                         sec_stream_str = StreamOptions.ZERO
@@ -816,13 +827,13 @@ class Cleaner:
                                     alg_type, funcname, size, cround=rnd,
                                     tv_size=erec.block_size, key_size=erec.key_size, iv_size=erec.iv_size,
                                     nexps=3, eprefix=eprefix,
-                                    streams=prim_stream, inp_stream=sec_stream_str)
+                                    streams=prim_stream, inp_stream=sec_stream_str, randomize_seed=True)
                             else:
                                 agg_scripts += generate_cfg_inp(
                                     alg_type, funcname, size, cround=rnd,
                                     tv_size=erec.block_size, key_size=erec.key_size, iv_size=erec.iv_size,
                                     nexps=3, eprefix=eprefix,
-                                    streams=prim_stream, key_stream=sec_stream_str)
+                                    streams=prim_stream, key_stream=sec_stream_str, randomize_seed=True)
 
                         except Exception as e:
                             logger.warning(f'Error in processing: {alg_type}:{funcname}:{size}:{rnd} {erec}, {methsize} err: {e}')
@@ -841,6 +852,112 @@ class Cleaner:
                 agg_filtered.append(crec)
 
         write_submit_obj(agg_filtered, sdir=tmpdir)
+
+    def comp_mpc(self, erec: FuncInfo, ftypename: str, specs, eprefix=None, randomize_seed=False):
+        if 'lowmc' in erec.fname:
+            return self.comp_lowmc(erec, ftypename, specs, eprefix, randomize_seed)
+
+        logger.info(f'Processing {ftypename}, specs: {specs}')
+        agg_scripts = []
+        fname = erec.fname
+
+        for methsize in specs.keys():
+            meth_parts = methsize.split(':')
+            meth, size = meth_parts[0], int(meth_parts[-1])
+            methsubs = meth.split('..')
+            has_key_prim = '.key' in methsubs[0]
+
+            prim_stream = StreamOptions.from_str(methsubs[0])  # key_stream for .key, plaintext for inp
+            has_plain_sec = len(methsubs) > 1 and '.inp' in methsubs[1]
+
+            sec_stream_type = methsubs[1].split('.')[0] if has_plain_sec else None
+            sec_stream_str = StreamOptions.from_str(sec_stream_type) if sec_stream_type else None
+            if sec_stream_str is None and has_key_prim:  # zero is default for col
+                sec_stream_str = StreamOptions.ZERO
+            if sec_stream_str is None and not has_key_prim:  # zero is default for default
+                sec_stream_str = StreamOptions.RND
+
+            rnd_info = specs[methsize]
+            if isinstance(rnd_info, (list, tuple)) and len(rnd_info) == 2 and isinstance(rnd_info[1], (list, tuple)):
+                rnd_info = rnd_info[1]
+            rnd_list = sorted(list(rnd_info))
+
+            fname_params = fname.replace('gmimc-', '').replace('mimc_hash-', '')
+            if fname_params not in MPC_SAGE_PARAMS:
+                logger.error(f'Unknown MPC function {fname}, no parameters')
+                continue
+
+            params = MPC_SAGE_PARAMS[fname_params]
+            to_gen_tpl = [fname_params, params.field, params.full_rounds, params.script, params.round_tpl,
+                          [(x,) for x in rnd_list]]
+            try:
+                if fname.startswith('Poseidon'):
+                    to_gen_tpl[-1] = [(r, 0, 0) for r in rnd_list]
+                elif fname.startswith('Starkad'):
+                    to_gen_tpl[-1] = [(r, 0, 0) for r in rnd_list]
+                elif fname.startswith('Rescue'):
+                    pass
+                elif fname.startswith('Vision'):
+                    pass
+                elif fname.startswith('gmimc'):
+                    pass
+                elif fname.startswith('mimc'):
+                    pass
+                else:
+                    logger.error(f'Unknown MPC function {fname}')
+                    continue
+
+                if has_key_prim:
+                    logger.error(f'.key not supported for {fname}')
+                    continue
+
+                agg_scripts += gen_script_config(
+                    [to_gen_tpl], params.is_prime(), data_sizes=[size],
+                    eprefix=eprefix, streams=prim_stream,
+                    use_as_key=has_key_prim, other_stream=sec_stream_str,
+                    randomize_seed=randomize_seed)
+
+            except Exception as e:
+                logger.warning(
+                    f'Error in processing: {erec.fname}:{size}:{rnd_info} {erec}, {methsize} err: {e}')
+                continue
+        return agg_scripts
+
+    def comp_lowmc(self, erec: FuncInfo, ftypename: str, specs, eprefix=None, randomize_seed=False):
+        logger.info(f'Processing {ftypename}, specs: {specs}')
+        agg_scripts = []
+
+        for methsize in specs.keys():
+            meth_parts = methsize.split(':')
+            meth, size = meth_parts[0], int(meth_parts[-1])
+            methsubs = meth.split('..')
+            has_key_prim = '.key' in methsubs[0]
+
+            prim_stream = StreamOptions.from_str(methsubs[0])  # key_stream for .key, plaintext for inp
+            has_plain_sec = len(methsubs) > 1 and '.inp' in methsubs[1]
+
+            sec_stream_type = methsubs[1].split('.')[0] if has_plain_sec else None
+            sec_stream_str = StreamOptions.from_str(sec_stream_type) if sec_stream_type else None
+            if sec_stream_str is None and has_key_prim:  # zero is default for col
+                sec_stream_str = StreamOptions.ZERO
+            if sec_stream_str is None and not has_key_prim:  # zero is default for default
+                sec_stream_str = StreamOptions.RND
+
+            rnd_info = specs[methsize]
+            if isinstance(rnd_info, (list, tuple)) and len(rnd_info) == 2 and isinstance(rnd_info[1], (list, tuple)):
+                rnd_info = rnd_info[1]
+
+            try:
+                agg_scripts += gen_lowmc_core(
+                    [(erec.fname, (None,), sorted(list(rnd_info)))], data_sizes=[size], eprefix=eprefix,
+                    streams=prim_stream, use_as_key=has_key_prim,
+                    other_stream=sec_stream_str, randomize_seed=randomize_seed)
+
+            except Exception as e:
+                logger.warning(
+                    f'Error in processing: {erec.fname}:{size}:{rnd_info} {erec}, {methsize} err: {e}')
+                continue
+        return agg_scripts
 
     @staticmethod
     def change_cstreams(config_js, cround, name, smidx, new_size=None, exp_count=3):
