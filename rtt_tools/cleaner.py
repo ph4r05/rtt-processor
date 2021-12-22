@@ -294,6 +294,34 @@ class Cleaner:
             self.conn.commit()
             logger.info('Experiment %s solved' % (eid,))
 
+    def fix_lowmc_key(self):
+        """LowMC experiments key naming convention refactoring"""
+        with self.conn.cursor() as c:
+            logger.info("Processing experiments")
+
+            c.execute("""SELECT e.id, name, dp.`provider_config`
+                            FROM experiments e
+                            JOIN rtt_data_providers dp ON e.data_file_id = dp.id
+                            WHERE e.id >= %s and name LIKE 'testmpc%%lowmc%%'
+                              """ % (self.exp_id_low,))
+
+            renames = []
+            for result in c.fetchall():
+                eid, name, config, = result[0], result[1], result[2]
+                if '-inp-key.' not in name:
+                    continue
+                nname = re.sub(r'-inp-key\.(.+?)-', '-inp-\\1.key-', name)
+                renames.append((eid, name, nname))
+
+            for eid, oname, nname in renames:
+                sql_exps = 'UPDATE experiments SET name=%s WHERE id=%s'
+                print(f'Updating {eid} to {nname}')
+                try_execute(lambda: c.execute(sql_exps, (nname, eid,)),
+                            msg="Update experiment with ID %s" % eid)
+
+            self.conn.commit()
+            logger.info('Experiment %s solved' % (eid,))
+
     def fix_tangle(self):
         """Tangle experiments were mislabeled, just fix the name"""
         with self.conn.cursor() as c:
@@ -557,7 +585,7 @@ class Cleaner:
             json.dump(js, fh)
 
     def _name_find(self, nname_find):
-        nname_find = re.sub(r'^PH4-SM-([\d]+)-', '', nname_find)
+        nname_find = re.sub(r'^PH4?-SM-([\d]+)-', '', nname_find)
         nname_find = re.sub(r'^testmpc([\d]+)-', '', nname_find)
         nname_find = re.sub(r'-i:(.+?)-.*$', '-i:\\1', nname_find)  # drop inp detailed specs
         return nname_find
