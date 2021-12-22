@@ -88,6 +88,9 @@ class MpcSageParams:
         self.script = script_name
         self.round_tpl = round_tpl
 
+    def is_prime(self):
+        return self.field.startswith('F')
+
 
 _ROUND_TPL_PS = '--rf 2 --rp 0 --red-rf1 %s --red-rf2 %s --red-rp %s'
 MPC_SAGE_PARAMS = {
@@ -846,7 +849,7 @@ def gen_script_config(to_gen, is_prime=True, data_sizes=None, eprefix=None, stre
             spread_name = configs[0][0]
 
             inp = configs[1][1]
-            seed = configs[1][2]
+            seed = inp['seed']
             cfull_tpl = myformat(full_tpl,
                                  tpl=ctpl,
                                  spreader=configs[0][1]
