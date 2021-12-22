@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import hashlib
 import os
 from typing import List
 
 import scipy.misc
 from functools import lru_cache
 import math
+import re
 import itertools
 import functools
 import binascii
@@ -219,12 +221,12 @@ class StreamOptions:
             return StreamOptions.LHW
         elif 'sac' in x:
             return StreamOptions.SAC
+        elif 'ornd' in x:
+            return StreamOptions.ORND
         elif 'rnd' in x:
             return StreamOptions.RND
         elif 'zero' in x:
             return StreamOptions.ZERO
-        elif 'ornd' in x:
-            return StreamOptions.ORND
         else:
             raise ValueError(f'Unknown generator: {x}')
 
@@ -314,7 +316,7 @@ def get_input_size(config):
         return config['stream']['block_size']
 
 
-def make_ctr_config(blen=31, offset='00', tv_count=None, min_data=None, core_only=False) -> dict:
+def make_ctr_config(blen=31, offset='00', tv_count=None, min_data=None, core_only=False, seed=None) -> dict:
     """
     Generate counter CryptoStreams config with configurable offset.
      - blen is block width in bytes
@@ -352,7 +354,7 @@ def make_ctr_config(blen=31, offset='00', tv_count=None, min_data=None, core_onl
 
     ctr_file = {
         "notes": note,
-        "seed": "0000000000000000",
+        "seed": seed or "0000000000000000",
         "tv-size": None,
         "tv-count": None,
         "tv_size": blen,
@@ -401,7 +403,7 @@ def make_ctr_core(blen, offset='00'):
 
 
 def make_hw_config(blen=31, weight=4, offset=None, tv_count=None, offset_range: float = None, min_data=None,
-                   core_only=False, return_aux=False):
+                   core_only=False, return_aux=False, seed=None):
     """
     Generate HW counter CryptoStreams config with configurable offset.
      - blen is block width in bytes
@@ -450,7 +452,7 @@ def make_hw_config(blen=31, weight=4, offset=None, tv_count=None, offset_range: 
 
     hw_file = {
         "notes": 'plaintext-' + note,
-        "seed": "0000000000000000",
+        "seed": seed or "0000000000000000",
         "tv-size": None,
         "tv-count": None,
         "tv_size": blen,
@@ -592,92 +594,92 @@ def augment_round_configs(to_gen):
     return res
 
 
-def gen_posseidon(data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW, **kwargs):
+def gen_posseidon(data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW, round_specs=None, **kwargs):
     rstsr = '--rf 2 --rp 0 --red-rf1 %s --red-rf2 %s --red-rp %s'
 
     # fname, field name, rounds structure, sage file, round string, rounds to test
     to_gen = [
-        ('Poseidon_S80b', 'F161', (8, 50), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
-        # ('Poseidon_S128a', 'F125', (8, 81), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
-        # ('Poseidon_S128b', 'F253', (8, 83), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
-        # ('Poseidon_S128c', 'F125', (8, 83), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
-        # ('Poseidon_S128d', 'F61', (8, 40), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
-        # ('Poseidon_S128e', 'F253', (8, 85), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
-        ('Poseidon_S128_BLS12_138', 'F_QBLS12_381', (8, 60), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
+        ('Poseidon_S80b', 'F161', (8, 50), 'starkad_poseidon.sage', rstsr, round_specs or [(1, 0, 0)]),
+        # ('Poseidon_S128a', 'F125', (8, 81), 'starkad_poseidon.sage', rstsr, round_specs or [(1, 0, 0)]),
+        # ('Poseidon_S128b', 'F253', (8, 83), 'starkad_poseidon.sage', rstsr, round_specs or [(1, 0, 0)]),
+        # ('Poseidon_S128c', 'F125', (8, 83), 'starkad_poseidon.sage', rstsr, round_specs or [(1, 0, 0)]),
+        # ('Poseidon_S128d', 'F61', (8, 40), 'starkad_poseidon.sage', rstsr, [round_specs or (1, 0, 0)]),
+        # ('Poseidon_S128e', 'F253', (8, 85), 'starkad_poseidon.sage', rstsr, round_specs or [(1, 0, 0)]),
+        ('Poseidon_S128_BLS12_138', 'F_QBLS12_381', (8, 60), 'starkad_poseidon.sage', rstsr, round_specs or [(1, 0, 0)]),
     ]
     return gen_prime_config(to_gen, data_sizes, eprefix=eprefix, streams=streams, **kwargs)
 
 
-def gen_starkad(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW, **kwargs):
+def gen_starkad(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW, round_specs=None, **kwargs):
     rstsr = '--rf 2 --rp 0 --red-rf1 %s --red-rf2 %s --red-rp %s'
 
     # fname, field name, rounds structure, sage file, round string, rounds to test
     to_gen = to_gen if to_gen else [
-        ('Starkad_S80b', 'Bin161', (8, 52), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
-        # ('Starkad_S128a', 'Bin127', (8, 85), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
-        # ('Starkad_S128b', 'Bin255', (8, 88), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
-        # ('Starkad_S128c', 'Bin127', (8, 86), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
-        # ('Starkad_S128d', 'Bin63', (8, 43), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
-        ('Starkad_S128e', 'Bin255', (8, 88), 'starkad_poseidon.sage', rstsr, [(1, 0, 0)]),
+        ('Starkad_S80b', 'Bin161', (8, 52), 'starkad_poseidon.sage', rstsr, round_specs or [(1, 0, 0)]),
+        # ('Starkad_S128a', 'Bin127', (8, 85), 'starkad_poseidon.sage', rstsr, round_specs or [(1, 0, 0)]),
+        # ('Starkad_S128b', 'Bin255', (8, 88), 'starkad_poseidon.sage', rstsr, round_specs or [(1, 0, 0)]),
+        # ('Starkad_S128c', 'Bin127', (8, 86), 'starkad_poseidon.sage', rstsr, round_specs or [(1, 0, 0)]),
+        # ('Starkad_S128d', 'Bin63', (8, 43), 'starkad_poseidon.sage', rstsr, round_specs or [(1, 0, 0)]),
+        ('Starkad_S128e', 'Bin255', (8, 88), 'starkad_poseidon.sage', rstsr, round_specs or [(1, 0, 0)]),
     ]
     return gen_binary_config(to_gen, data_sizes, eprefix=eprefix, streams=streams, **kwargs)
 
 
-def gen_rescue(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW, **kwargs):
+def gen_rescue(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW, round_specs=None, **kwargs):
     rstsr = '-r %s'
 
     # fname, field name, rounds structure, sage file, round string, rounds to test
     to_gen = to_gen if to_gen else [
-        ('Rescue_S45a', 'F91', (10,), 'vision.sage', rstsr, [(1,), (2,)]),
-        # ('Rescue_S45b', 'F91', (10,), 'vision.sage', rstsr, [(1,), (2,)]),
-        # ('Rescue_S80a', 'F81', (10,), 'vision.sage', rstsr, [(1,), (2,)]),
-        # ('Rescue_S80b', 'F161', (10,), 'vision.sage', rstsr, [(1,), (2,)]),
-        # ('Rescue_S128a', 'F125', (16,), 'vision.sage', rstsr, [(1,), (2,)]),
-        # ('Rescue_S128b', 'F253', (22,), 'vision.sage', rstsr, [(1,), (2,)]),
-        ('Rescue_S128e', 'F253', (10,), 'vision.sage', rstsr, [(1,), (2,)]),
+        ('Rescue_S45a', 'F91', (10,), 'vision.sage', rstsr, round_specs or [(1,), (2,)]),
+        # ('Rescue_S45b', 'F91', (10,), 'vision.sage', rstsr, round_specs or [(1,), (2,)]),
+        # ('Rescue_S80a', 'F81', (10,), 'vision.sage', rstsr, round_specs or [(1,), (2,)]),
+        # ('Rescue_S80b', 'F161', (10,), 'vision.sage', rstsr, round_specs or [(1,), (2,)]),
+        # ('Rescue_S128a', 'F125', (16,), 'vision.sage', rstsr, round_specs or [(1,), (2,)]),
+        # ('Rescue_S128b', 'F253', (22,), 'vision.sage', rstsr, round_specs or [(1,), (2,)]),
+        ('Rescue_S128e', 'F253', (10,), 'vision.sage', rstsr, round_specs or [(1,), (2,)]),
     ]
     return gen_prime_config(to_gen, data_sizes, eprefix=eprefix, streams=streams, **kwargs)
 
 
-def gen_vision(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW, **kwargs):
+def gen_vision(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW, round_specs=None, **kwargs):
     rstsr = '-r %s'
 
     # fname, field name, rounds structure, sage file, round string, rounds to test
     to_gen = to_gen if to_gen else [
-        ('Vision_S45a', 'Bin91', (10,), 'vision.sage', rstsr, [(1,), (2,)]),
-        # ('Vision_S45b', 'Bin91', (10,), 'vision.sage', rstsr, [(1,), (2,)]),
-        # ('Vision_S80a', 'Bin81', (10,), 'vision.sage', rstsr, [(1,), (2,)]),
-        # ('Vision_S80b', 'Bin161', (10,), 'vision.sage', rstsr, [(1,), (2,)]),
-        # ('Vision_S128a', 'Bin127', (12,), 'vision.sage', rstsr, [(1,), (2,)]),
-        # ('Vision_S128b', 'Bin255', (26,), 'vision.sage', rstsr, [(1,), (2,)]),
-        ('Vision_S128d', 'Bin63', (10,), 'vision.sage', rstsr, [(1,), (2,)]),
+        ('Vision_S45a', 'Bin91', (10,), 'vision.sage', rstsr, round_specs or [(1,), (2,)]),
+        # ('Vision_S45b', 'Bin91', (10,), 'vision.sage', rstsr, round_specs or [(1,), (2,)]),
+        # ('Vision_S80a', 'Bin81', (10,), 'vision.sage', rstsr, round_specs or [(1,), (2,)]),
+        # ('Vision_S80b', 'Bin161', (10,), 'vision.sage', rstsr, round_specs or [(1,), (2,)]),
+        # ('Vision_S128a', 'Bin127', (12,), 'vision.sage', rstsr, round_specs or [(1,), (2,)]),
+        # ('Vision_S128b', 'Bin255', (26,), 'vision.sage', rstsr, round_specs or [(1,), (2,)]),
+        ('Vision_S128d', 'Bin63', (10,), 'vision.sage', rstsr, round_specs or [(1,), (2,)]),
     ]
     return gen_binary_config(to_gen, data_sizes, eprefix=eprefix, streams=streams, **kwargs)
 
 
-def gen_gmimc(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW, **kwargs):
+def gen_gmimc(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW, round_specs=None, **kwargs):
     rstsr = '-r %s'
 
     # fname, field name, rounds structure, sage file, round string, rounds to test
     to_gen = to_gen if to_gen else [
-        ('S45a', 'F91', (121,), 'gmimc.sage', rstsr, [(1,), (2,)]),
-        # ('S45b', 'F91', (137,), 'gmimc.sage', rstsr, [(1,), (2,)]),
-        # ('S80a', 'F81', (111,), 'gmimc.sage', rstsr, [(1,), (2,)]),
-        # ('S80b', 'F161', (210,), 'gmimc.sage', rstsr, [(1,), (2,)]),
-        # ('S128a', 'F125', (166,), 'gmimc.sage', rstsr, [(1,), (2,)]),
-        ('S128e', 'F253', (342,), 'gmimc.sage', rstsr, [(1,), (2,)]),
+        ('S45a', 'F91', (121,), 'gmimc.sage', rstsr, round_specs or [(1,), (2,)]),
+        # ('S45b', 'F91', (137,), 'gmimc.sage', rstsr, round_specs or [(1,), (2,)]),
+        # ('S80a', 'F81', (111,), 'gmimc.sage', rstsr, round_specs or [(1,), (2,)]),
+        # ('S80b', 'F161', (210,), 'gmimc.sage', rstsr, round_specs or [(1,), (2,)]),
+        # ('S128a', 'F125', (166,), 'gmimc.sage', rstsr, round_specs or [(1,), (2,)]),
+        ('S128e', 'F253', (342,), 'gmimc.sage', rstsr, round_specs or [(1,), (2,)]),
     ]
     return gen_prime_config(to_gen, data_sizes, eprefix=eprefix, streams=streams, **kwargs)
 
 
-def gen_mimc(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW, **kwargs):
+def gen_mimc(data_sizes=None, eprefix=None, to_gen=None, streams=StreamOptions.CTR_LHW, round_specs=None, **kwargs):
     rstsr = '-r %s'
 
     # fname, field name, rounds structure, sage file, round string, rounds to test
     to_gen = to_gen if to_gen else [
-        ('S45', 'F91', (116,), 'mimc_hash.sage', rstsr, [(1,), (2,)]),
-        ('S80', 'F161', (204,), 'mimc_hash.sage', rstsr, [(1,), (2,)]),
-        ('S128', 'F253', (320,), 'mimc_hash.sage', rstsr, [(1,), (2,)]),
+        ('S45', 'F91', (116,), 'mimc_hash.sage', rstsr, round_specs or [(1,), (2,)]),
+        ('S80', 'F161', (204,), 'mimc_hash.sage', rstsr, round_specs or [(1,), (2,)]),
+        ('S128', 'F253', (320,), 'mimc_hash.sage', rstsr, round_specs or [(1,), (2,)]),
     ]
     return gen_prime_config(to_gen, data_sizes, eprefix=eprefix, streams=streams, **kwargs)
 
@@ -758,7 +760,7 @@ def myformat(_fmtstr, **kwargs):
 
 
 def gen_script_config(to_gen, is_prime=True, data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW,
-                      use_as_key=False, other_stream=None, **kwargs):
+                      use_as_key=False, other_stream=None, randomize_seed=False, **kwargs):
     data_sizes = data_sizes or [100 * 1024 * 1024]
 
     tpl = '{{SAGE_BIN}} {{RTT_EXEC}}/rtt-mpc/rtt_mpc/{{sfile}} ' \
@@ -783,6 +785,12 @@ def gen_script_config(to_gen, is_prime=True, data_sizes=None, eprefix=None, stre
         sfile = cpos[3]
         rrounds = cpos[2]  # full rounds specs
 
+        seed_randomizer_src = f'{cpos[0]}'.encode('utf8')
+        seed_randomizer = hashlib.sha256(seed_randomizer_src).hexdigest()[:8]
+
+        def seedg(seed):
+            return seed if not randomize_seed else merge_seeds(seed, seed_randomizer)
+
         moduli = MODULI[cpos[1]]
         moduli_bits = log2ceil(moduli)
         inp_block_bytes = get_smaller_byteblock(moduli_bits)  # byte-aligned fits all in moduli (generator, input)
@@ -803,30 +811,30 @@ def gen_script_config(to_gen, is_prime=True, data_sizes=None, eprefix=None, stre
         if min_data < max_out or req_data < max_out:
             raise ValueError('Assertion error on min data')
 
-        # TODO: blen align to key size
+        # TODO: blen align to key size for use_as_key==True
         ctr_configs = [
-            ('ctr00-b%s' % inp_block_bytes, make_ctr_config(inp_block_bytes, offset='00', min_data=min_data)),
-            ('ctr01-b%s' % inp_block_bytes, make_ctr_config(inp_block_bytes, offset='01', min_data=min_data)),
-            ('ctr02-b%s' % inp_block_bytes, make_ctr_config(inp_block_bytes, offset='02', min_data=min_data)),
+            ('ctr00-b%s' % inp_block_bytes, make_ctr_config(inp_block_bytes, offset='00', min_data=min_data, seed=seedg('0000000000000000'))),
+            ('ctr01-b%s' % inp_block_bytes, make_ctr_config(inp_block_bytes, offset='01', min_data=min_data, seed=seedg('0000000000000001'))),
+            ('ctr02-b%s' % inp_block_bytes, make_ctr_config(inp_block_bytes, offset='02', min_data=min_data, seed=seedg('0000000000000002'))),
         ] if StreamOptions.has_ctr(streams) else []
 
         weight = comp_hw_weight(inp_block_bytes, samples=3, min_data=min_data)
         hw_configs = [
-            ('lhw00-b%s-w%s' % (inp_block_bytes, weight), make_hw_config(inp_block_bytes, weight=weight, offset_range=0.0, min_data=min_data)),
-            ('lhw01-b%s-w%s' % (inp_block_bytes, weight), make_hw_config(inp_block_bytes, weight=weight, offset_range=1/3., min_data=min_data)),
-            ('lhw02-b%s-w%s' % (inp_block_bytes, weight), make_hw_config(inp_block_bytes, weight=weight, offset_range=2/3., min_data=min_data)),
+            ('lhw00-b%s-w%s' % (inp_block_bytes, weight), make_hw_config(inp_block_bytes, weight=weight, offset_range=0.0, min_data=min_data, seed=seedg('0000000000000003'))),
+            ('lhw01-b%s-w%s' % (inp_block_bytes, weight), make_hw_config(inp_block_bytes, weight=weight, offset_range=1/3., min_data=min_data, seed=seedg('0000000000000004'))),
+            ('lhw02-b%s-w%s' % (inp_block_bytes, weight), make_hw_config(inp_block_bytes, weight=weight, offset_range=2/3., min_data=min_data, seed=seedg('0000000000000005'))),
         ] if StreamOptions.has_lhw(streams) else []
 
         sac_configs = [
-            ('sac00-b%s' % inp_block_bytes, get_single_stream(StreamOptions.SAC), '0000000000000006'),
-            ('sac01-b%s' % inp_block_bytes, get_single_stream(StreamOptions.SAC), '0000000000000007'),
-            ('sac02-b%s' % inp_block_bytes, get_single_stream(StreamOptions.SAC), '0000000000000008'),
+            ('sac00-b%s' % inp_block_bytes, get_single_stream(StreamOptions.SAC), seedg('0000000000000006')),
+            ('sac01-b%s' % inp_block_bytes, get_single_stream(StreamOptions.SAC), seedg('0000000000000007')),
+            ('sac02-b%s' % inp_block_bytes, get_single_stream(StreamOptions.SAC), seedg('0000000000000008')),
         ] if StreamOptions.has_sac(streams) else []
 
         rnd_configs = [
-            ('rnd00-b%s' % inp_block_bytes, get_single_stream(StreamOptions.RND), '0000000000000009'),
-            ('rnd01-b%s' % inp_block_bytes, get_single_stream(StreamOptions.RND), '000000000000000a'),
-            ('rnd02-b%s' % inp_block_bytes, get_single_stream(StreamOptions.RND), '000000000000000b'),
+            ('rnd00-b%s' % inp_block_bytes, get_single_stream(StreamOptions.RND), seedg('0000000000000009')),
+            ('rnd01-b%s' % inp_block_bytes, get_single_stream(StreamOptions.RND), seedg('000000000000000a')),
+            ('rnd02-b%s' % inp_block_bytes, get_single_stream(StreamOptions.RND), seedg('000000000000000b')),
         ] if StreamOptions.has_rnd(streams) else []
 
         agg_inputs = ctr_configs + hw_configs + sac_configs + rnd_configs
@@ -892,10 +900,35 @@ def gen_lowmc(data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW):
     return gen_lowmc_core(to_gen, data_sizes, eprefix, streams)
 
 
+def subs_mpc_stream(sname, addition):
+    return re.sub(r'^(.+?)(\d+)(.+)$', '\\1\\2{{HERE}}\\3', sname).replace('{{HERE}}', addition)
+
+
+def build_aux_stream_desc(other_stream, other_stream_type):
+    if StreamOptions.has_ctr(other_stream):
+        return f'..ctr.{other_stream_type}'
+    elif StreamOptions.has_lhw(other_stream):
+        return f'..lhw.{other_stream_type}'
+    elif StreamOptions.has_sac(other_stream):
+        return f'..sac.{other_stream_type}'
+    elif StreamOptions.has_rnd(other_stream):
+        return f'..rnd.{other_stream_type}'
+    elif StreamOptions.has_rnd_once(other_stream):
+        return f'..ornd.{other_stream_type}'
+    return None
+
+
 def gen_lowmc_core(to_gen, data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW,
-                   use_as_key=False, other_stream=None):
+                   use_as_key=False, other_stream=None, randomize_seed=False):
     data_sizes = data_sizes or [100 * 1024 * 1024]
     full_tpl = '{{CRYPTOSTREAMS_BIN}} -c={{FILE_CONFIG1.JSON}}'
+
+    other_stream_spec = other_stream
+    seed_randomizer_src = f'{FuncInfo.BLOCK}:lowmc'.encode('utf8')
+    seed_randomizer = hashlib.sha256(seed_randomizer_src).hexdigest()[:8]
+
+    def seedg(seed):
+        return seed if not randomize_seed else merge_seeds(seed, seed_randomizer)
 
     agg_configs = []
     agg_scripts = []
@@ -913,37 +946,42 @@ def gen_lowmc_core(to_gen, data_sizes=None, eprefix=None, streams=StreamOptions.
         inp_blen = inp_block_bytes if not use_as_key else key_size
 
         ctr_configs = [
-            ('ctr00-b%s' % inp_blen, make_ctr_config(inp_blen, offset='00', min_data=min_data), '0000000000000000'),
-            ('ctr01-b%s' % inp_blen, make_ctr_config(inp_blen, offset='01', min_data=min_data), '0000000000000001'),
-            ('ctr02-b%s' % inp_blen, make_ctr_config(inp_blen, offset='02', min_data=min_data), '0000000000000002'),
+            ('ctr00-b%s' % inp_blen, make_ctr_config(inp_blen, offset='00', min_data=min_data), seedg('0000000000000000')),
+            ('ctr01-b%s' % inp_blen, make_ctr_config(inp_blen, offset='01', min_data=min_data), seedg('0000000000000001')),
+            ('ctr02-b%s' % inp_blen, make_ctr_config(inp_blen, offset='02', min_data=min_data), seedg('0000000000000002')),
         ] if StreamOptions.has_ctr(streams) else []
 
         weight = comp_hw_weight(inp_blen, samples=3, min_data=min_data)
         hw_configs = [
             ('lhw00-b%s-w%s' % (inp_blen, weight),
-             make_hw_config(inp_blen, weight=weight, offset_range=0.0, min_data=min_data), '0000000000000003'),
+             make_hw_config(inp_blen, weight=weight, offset_range=0.0, min_data=min_data), seedg('0000000000000003')),
             ('lhw01-b%s-w%s' % (inp_blen, weight),
-             make_hw_config(inp_blen, weight=weight, offset_range=1/3., min_data=min_data), '0000000000000004'),
+             make_hw_config(inp_blen, weight=weight, offset_range=1/3., min_data=min_data), seedg('0000000000000004')),
             ('lhw02-b%s-w%s' % (inp_blen, weight),
-             make_hw_config(inp_blen, weight=weight, offset_range=2/3., min_data=min_data), '0000000000000005'),
+             make_hw_config(inp_blen, weight=weight, offset_range=2/3., min_data=min_data), seedg('0000000000000005')),
         ] if StreamOptions.has_lhw(streams) else []
 
         sac_configs = [
-            ('sac00-b%s' % inp_blen, {'stream': {'type': 'sac'}}, '0000000000000006'),
-            ('sac01-b%s' % inp_blen, {'stream': {'type': 'sac'}}, '0000000000000007'),
-            ('sac02-b%s' % inp_blen, {'stream': {'type': 'sac'}}, '0000000000000008'),
+            ('sac00-b%s' % inp_blen, {'stream': get_single_stream(StreamOptions.SAC)}, seedg('0000000000000006')),
+            ('sac01-b%s' % inp_blen, {'stream': get_single_stream(StreamOptions.SAC)}, seedg('0000000000000007')),
+            ('sac02-b%s' % inp_blen, {'stream': get_single_stream(StreamOptions.SAC)}, seedg('0000000000000008')),
         ] if StreamOptions.has_sac(streams) else []
 
         rnd_configs = [
-            ('rnd00-b%s' % inp_blen, {'stream': get_single_stream(StreamOptions.RND)}, '0000000000000009'),
-            ('rnd01-b%s' % inp_blen, {'stream': get_single_stream(StreamOptions.RND)}, '000000000000000a'),
-            ('rnd02-b%s' % inp_blen, {'stream': get_single_stream(StreamOptions.RND)}, '000000000000000b'),
+            ('rnd00-b%s' % inp_blen, {'stream': get_single_stream(StreamOptions.RND)}, seedg('0000000000000009')),
+            ('rnd01-b%s' % inp_blen, {'stream': get_single_stream(StreamOptions.RND)}, seedg('000000000000000a')),
+            ('rnd02-b%s' % inp_blen, {'stream': get_single_stream(StreamOptions.RND)}, seedg('000000000000000b')),
         ] if StreamOptions.has_rnd(streams) else []
 
         agg_inputs = ctr_configs + hw_configs + sac_configs + rnd_configs
         agg_spreads = [('', None)]  # get_binary_strategies(moduli_bits, out_block_bits, max_out_b)
 
-        other_stream = get_single_stream(StreamOptions.RND) if not use_as_key else get_single_stream(StreamOptions.ZERO)
+        other_stream = get_single_stream(other_stream_spec) if other_stream_spec is not None else (
+            get_single_stream(StreamOptions.RND) if not use_as_key else get_single_stream(StreamOptions.ZERO))
+        other_stream_type = '' if not use_as_key else '.inp'
+        aux_inp_spec = ''
+        if use_as_key and other_stream_spec is not None:  # support this only for col/key versions
+            aux_inp_spec = build_aux_stream_desc(other_stream_spec, other_stream_type) or ''
 
         for configs in itertools.product(agg_spreads, agg_inputs):
             inp_name = configs[1][0]
@@ -953,14 +991,15 @@ def gen_lowmc_core(to_gen, data_sizes=None, eprefix=None, streams=StreamOptions.
             inp = configs[1][1]
             cfull_tpl = full_tpl
 
-            inp_mod = '' if not use_as_key else 'key.'
+            inp_mod = '' if not use_as_key else '.key'
+            inp_name_full = subs_mpc_stream(inp_name, inp_mod + aux_inp_spec)
             input_stream = inp['stream'] if not use_as_key else other_stream
             key_stream = other_stream if not use_as_key else inp['stream']
 
             agg_configs.append((inp, cfull_tpl))
-            ename = '%s%s-%s-raw-r%s-inp-%s%s-spr-%s-s%sMB' \
+            ename = '%s%s-%s-raw-r%s-inp-%s-spr-%s-s%sMB' \
                     % (eprefix or '', cpos[0], 'bin',
-                       cpos[2], inp_mod, inp_name, spread_name, int(max_out / 1024 / 1024))
+                       cpos[2], inp_name_full, spread_name, int(max_out / 1024 / 1024))
             notes = inp['notes'] if 'notes' in inp else ename
 
             lowmc_cfg = {
@@ -1076,7 +1115,13 @@ def generate_prng_col(algorithm, data_size, cround=1, tv_size=None, key_size=Non
                             streams, inp_stream)
 
 
-def generate_streams(tv_count, tv_size, streams=StreamOptions.CTR_LHW, nexps=3):
+def merge_seeds(seed, randomizer):
+    if not randomizer:
+        return seed
+    return randomizer + seed[len(randomizer):]
+
+
+def generate_streams(tv_count, tv_size, streams=StreamOptions.CTR_LHW, nexps=3, seed_randomizer=None):
     agg_inputs = []
     # CTR
     for ix in range(nexps if StreamOptions.has_ctr(streams) else 0):
@@ -1084,17 +1129,18 @@ def generate_streams(tv_count, tv_size, streams=StreamOptions.CTR_LHW, nexps=3):
                                   core_only=True)  # type: dict
         agg_inputs.append(
             StreamRec(stype='ctr', sdesc=f'{tv_size * 8}sbit-offset-{ix}', sscript=sscript,
-                      expid=ix, seed=int_to_seed(ix))
+                      expid=ix, seed=merge_seeds(int_to_seed(ix), seed_randomizer))
         )
 
     # LHW
     weight = comp_hw_weight(tv_size, samples=nexps, min_samples=tv_count)
     for ix in range(nexps if StreamOptions.has_lhw(streams) else 0):
         sscript = make_hw_config(tv_size, weight=weight, offset_range=ix / float(nexps),
-                                 tv_count=tv_count, return_aux=True)  # type: HwConfig
+                                 tv_count=tv_count, return_aux=True,
+                                 seed=merge_seeds(int_to_seed(nexps + ix), seed_randomizer))  # type: HwConfig
         agg_inputs.append(
             StreamRec(stype='hw', sdesc=sscript.note, sscript=sscript.core,
-                      expid=ix, seed=int_to_seed(nexps + ix))
+                      expid=ix, seed=merge_seeds(int_to_seed(nexps + ix), seed_randomizer))
         )
 
     # SAC
@@ -1102,7 +1148,7 @@ def generate_streams(tv_count, tv_size, streams=StreamOptions.CTR_LHW, nexps=3):
         sscript = {'type': 'sac'}
         agg_inputs.append(
             StreamRec(stype='sac', sdesc=f'{tv_size * 8}sbit-offset-{ix}', sscript=sscript,
-                      expid=ix, seed=int_to_seed(2 * nexps + ix))
+                      expid=ix, seed=merge_seeds(int_to_seed(2 * nexps + ix), seed_randomizer))
         )
 
     # RND
@@ -1110,7 +1156,7 @@ def generate_streams(tv_count, tv_size, streams=StreamOptions.CTR_LHW, nexps=3):
         sscript = {'type': 'pcg32_stream'}
         agg_inputs.append(
             StreamRec(stype='rnd', sdesc=f'{tv_size * 8}sbit-offset-{ix}', sscript=sscript,
-                      expid=ix, seed=int_to_seed(3 * nexps + ix))
+                      expid=ix, seed=merge_seeds(int_to_seed(3 * nexps + ix), seed_randomizer))
         )
 
     # ORND
@@ -1118,7 +1164,7 @@ def generate_streams(tv_count, tv_size, streams=StreamOptions.CTR_LHW, nexps=3):
         sscript = get_single_stream(StreamOptions.ORND)
         agg_inputs.append(
             StreamRec(stype='ornd', sdesc=f'{tv_size * 8}sbit-offset-{ix}', sscript=sscript,
-                      expid=ix, seed=int_to_seed(4 * nexps + ix))
+                      expid=ix, seed=merge_seeds(int_to_seed(4 * nexps + ix), seed_randomizer))
         )
 
     # ZERO
@@ -1126,16 +1172,17 @@ def generate_streams(tv_count, tv_size, streams=StreamOptions.CTR_LHW, nexps=3):
         sscript = get_single_stream(StreamOptions.ZERO)
         agg_inputs.append(
             StreamRec(stype='zero', sdesc=f'{tv_size * 8}sbit-offset-{ix}', sscript=sscript,
-                      expid=ix, seed=int_to_seed(5 * nexps + ix))
+                      expid=ix, seed=merge_seeds(int_to_seed(5 * nexps + ix), seed_randomizer))
         )
     return agg_inputs
 
 
 def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=None, key_size=None, iv_size=None, nexps=3,
-                     eprefix='', streams=StreamOptions.CTR_LHW, inp_stream=StreamOptions.ZERO):
+                     eprefix='', streams=StreamOptions.CTR_LHW, inp_stream=StreamOptions.ZERO, randomize_seed=False):
     """
     inp_stream is more or less useless for stream functions as they generate a keystream
-    tv_size defines number of bytes to generate using current key value
+    tv_size defines number of bytes to generate using current key value.
+    randomize_seed: if true, high 4 bytes of the seed are randomized using ftypename:round hash
     Inspired by taro_proc.py
     """
     is_block = alg_type == 'block'
@@ -1157,21 +1204,18 @@ def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=None, key
     size_mbs = int(math.ceil(data_size / 1024 / 1024))
     iv_size = iv_size or 0
 
+    seed_randomizer_src = f'{alg_type}:{algorithm}'.encode('utf8')
+    seed_randomizer = hashlib.sha256(seed_randomizer_src).hexdigest()[:8]
+
     if not is_block and not is_stream and not is_prng:
         raise ValueError('Unknown alg type: %s' % (alg_type,))
 
     if is_prng and inp_stream != StreamOptions.ZERO:
         raise ValueError('PRNG supports only zero input stream')
 
-    aux_inp_spec = ''
-    if StreamOptions.has_ctr(inp_stream):
-        aux_inp_spec = '..ctr.inp'
-    elif StreamOptions.has_lhw(inp_stream):
-        aux_inp_spec = '..lhw.inp'
-    elif StreamOptions.has_rnd(inp_stream):
-        aux_inp_spec = '..rnd.inp'
-
-    agg_inputs = generate_streams(tv_count=key_count, tv_size=inp_block_bytes, streams=streams, nexps=nexps)
+    aux_inp_spec = build_aux_stream_desc(inp_stream, 'inp') or ''
+    agg_inputs = generate_streams(tv_count=key_count, tv_size=inp_block_bytes, streams=streams, nexps=nexps,
+                                  seed_randomizer=seed_randomizer if randomize_seed else None)
     agg_scripts = []
     for configs in agg_inputs:
         src_type = configs.stype
@@ -1248,7 +1292,8 @@ def generate_stream_inp(algorithm, data_size, cround=1, tv_size=None, key_size=N
 
 
 def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=None, key_size=None, iv_size=None, nexps=3,
-                     eprefix='', streams=StreamOptions.CTR_LHW_SAC, key_stream=StreamOptions.RND):
+                     eprefix='', streams=StreamOptions.CTR_LHW_SAC, key_stream=StreamOptions.RND,
+                     randomize_seed=False):
     """
     Generates cryptostreams-based hash/block/stream cipher/prng config with plaintext/source input strategies
     """
@@ -1274,6 +1319,7 @@ def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=None, key
     iv_size = iv_size or 0
     tv_count = int(math.ceil(data_size / tv_size))
     size_mbs = int(math.ceil(data_size / 1024 / 1024))
+
     aux_key_spec = ''
     if StreamOptions.has_ctr(key_stream):
         aux_key_spec = '..ctr.key'
@@ -1282,7 +1328,11 @@ def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=None, key
     elif StreamOptions.has_zero(key_stream):
         aux_key_spec = '..zero.key'
 
-    agg_inputs = generate_streams(tv_count=tv_count, tv_size=tv_size, streams=streams, nexps=nexps)
+    seed_randomizer_src = f'{alg_type}:{algorithm}'.encode('utf8')
+    seed_randomizer = hashlib.sha256(seed_randomizer_src).hexdigest()[:8]
+
+    agg_inputs = generate_streams(tv_count=tv_count, tv_size=tv_size, streams=streams, nexps=nexps,
+                                  seed_randomizer=seed_randomizer if randomize_seed else None)
     agg_scripts = []
     for configs in agg_inputs:
         src_type = configs.stype
