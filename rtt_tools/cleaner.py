@@ -18,6 +18,7 @@ import argparse
 import random
 from typing import Optional, List, Dict, Tuple, Union, Any, Sequence, Iterable, Collection
 
+from rtt_tools.dump_data import chunks
 from rtt_tools.generator_mpc import get_input_key, get_input_size, comp_hw_weight, make_hw_config, HwConfig, \
     comb_cached, rank, HwSpaceTooSmall, generate_cfg_col, StreamOptions, ExpRec, write_submit_obj, generate_cfg_inp, \
     gen_lowmc_core, gen_script_config, MPC_SAGE_PARAMS
@@ -347,11 +348,25 @@ class Cleaner:
             logger.info(f'Enames: {json.dumps(enames, indent=2)}')
             logger.info(f'Duplicates: {json.dumps(dupes, indent=2)}')
 
-            for eid, name in dupes:
-                sql_exps = 'DELETE FROM experiments WHERE id=%s'
-                print(f'Deleting {eid} {name} duplicate')
+            for eids in chunks([str(x[0]) for x in dupes], 20):
+                sql_exps = f'DELETE FROM jobs WHERE experiment_id IN ({",".join(eids)})'
+                print(f'Deleting jobs for {eids} duplicate')
+                try_execute(lambda: c.execute(sql_exps, ()),
+                            msg=f"Delete jobs for experiment with IDs {eids}")
+            self.conn.commit()
+
+            for eids in chunks([str(x[0]) for x in dupes], 20):
+                sql_exps = f'UPDATE experiments SET status="finished" WHERE id IN ({",".join(eids)})'
+                print(f'finishing {eids} duplicate')
                 try_execute(lambda: c.execute(sql_exps, (eid,)),
-                            msg="Delete experiment with ID %s" % eid)
+                            msg=f"update experiment with ID {eids}")
+            self.conn.commit()
+
+            for eids in chunks([str(x[0]) for x in dupes], 20):
+                sql_exps = f'DELETE FROM experiments WHERE id IN ({",".join(eids)})'
+                print(f'Deleting {eids} duplicate')
+                try_execute(lambda: c.execute(sql_exps, ()),
+                            msg=f"Delete experiments with IDs {eids}")
                 self.conn.commit()
 
             for name in enames:
