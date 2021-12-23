@@ -881,7 +881,7 @@ class Cleaner:
                             logger.warning(f'Error in processing: {alg_type}:{funcname}:{size}:{rnd} {erec}, {methsize} err: {e}')
                             continue
 
-        logger.info('Writing submit file')
+        logger.info(f'Writing submit file, len: {len(agg_scripts)}')
         agg_filtered = []
         with open(os.path.join(tmpdir, '__enqueue.sh'), 'w+') as fh:
             fh.write('#!/bin/bash\n')
@@ -893,6 +893,7 @@ class Cleaner:
                 logger.info(f'submit: {crec.ename}, {crec.fname}, {crec.ssize} MB')
                 agg_filtered.append(crec)
 
+        logger.info(f'Submit size: {len(agg_filtered)}')
         write_submit_obj(agg_filtered, sdir=tmpdir)
 
     def comp_mpc(self, erec: FuncInfo, ftypename: str, specs, eprefix=None, randomize_seed=False):
@@ -905,7 +906,7 @@ class Cleaner:
 
         for methsize in specs.keys():
             meth_parts = methsize.split(':')
-            meth, size = meth_parts[0], int(meth_parts[-1])
+            meth, spread, size = meth_parts[0], meth_parts[1], int(meth_parts[-1])
             methsubs = meth.split('..')
             has_key_prim = '.key' in methsubs[0]
 
@@ -957,7 +958,7 @@ class Cleaner:
                     [to_gen_tpl], params.is_prime(), data_sizes=[size],
                     eprefix=eprefix, streams=prim_stream,
                     use_as_key=has_key_prim, other_stream=sec_stream_str,
-                    randomize_seed=randomize_seed)
+                    randomize_seed=randomize_seed, spread=spread)
 
             except Exception as e:
                 logger.warning(
