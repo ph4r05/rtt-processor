@@ -323,6 +323,48 @@ class Cleaner:
             self.conn.commit()
             logger.info('Experiment %s solved' % (eid,))
 
+    def fix_mpc_dups(self, from_id=None):
+        """Filter MPC duplicates"""
+        with self.conn.cursor() as c:
+            logger.info("Processing experiments")
+
+            c.execute("""SELECT e.id, name, dp.`provider_config`
+                            FROM experiments e
+                            JOIN rtt_data_providers dp ON e.data_file_id = dp.id
+                            WHERE e.id >= %s and name LIKE 'PH4-SM-60%%'
+                              """ % (from_id or self.exp_id_low,))
+
+            dupes = []
+            enames = {}
+            for result in c.fetchall():
+                eid, name, config, = result[0], result[1], result[2]
+                if name in enames:
+                    dupes.append([eid, name])
+                    continue
+
+                enames[name] = eid
+
+            logger.info(f'Enames: {json.dumps(enames, indent=2)}')
+            logger.info(f'Duplicates: {json.dumps(dupes, indent=2)}')
+
+            for eid, name in dupes:
+                sql_exps = 'DELETE FROM experiments WHERE id=%s'
+                print(f'Deleting {eid} {name} duplicate')
+                try_execute(lambda: c.execute(sql_exps, (eid,)),
+                            msg="Delete experiment with ID %s" % eid)
+                self.conn.commit()
+
+            for name in enames:
+                eid = enames[eid]
+                nname = re.sub(r'^PH4-SM-([\d]+)-', 'testmpc\\1-', name)
+                sql_exps = 'UPDATE experiments SET name=%s WHERE id=%s'
+                print(f'Updating {eid} to {nname}')
+            #     try_execute(lambda: c.execute(sql_exps, (nname, eid,)),
+            #                 msg="Update experiment with ID %s" % eid)
+
+            self.conn.commit()
+            logger.info('Finished')
+
     def fix_tangle(self):
         """Tangle experiments were mislabeled, just fix the name"""
         with self.conn.cursor() as c:
