@@ -370,12 +370,12 @@ class Cleaner:
                 self.conn.commit()
 
             for name in enames:
-                eid = enames[eid]
+                eid = enames[name]
                 nname = re.sub(r'^PH4-SM-([\d]+)-', 'testmpc\\1-', name)
                 sql_exps = 'UPDATE experiments SET name=%s WHERE id=%s'
                 print(f'Updating {eid} to {nname}')
-            #     try_execute(lambda: c.execute(sql_exps, (nname, eid,)),
-            #                 msg="Update experiment with ID %s" % eid)
+                try_execute(lambda: c.execute(sql_exps, (nname, eid,)),
+                            msg="Update experiment with ID %s" % eid)
 
             self.conn.commit()
             logger.info('Finished')
