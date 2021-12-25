@@ -500,6 +500,10 @@ class Cleaner:
                 try_execute(lambda: c.execute(sql_exps, (jid,)),
                             msg="Update job with ID %s" % jid)
 
+                sql_exps = 'UPDATE experiments SET status="pending" WHERE id=%s'
+                try_execute(lambda: c.execute(sql_exps, (eid,)),
+                            msg="Update experiment with ID %s" % eid)
+
         self.conn.commit()
 
     def fix_tangle(self):
