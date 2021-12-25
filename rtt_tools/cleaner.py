@@ -19,6 +19,7 @@ import random
 from typing import Optional, List, Dict, Tuple, Union, Any, Sequence, Iterable, Collection
 
 from rtt_tools.dump_data import chunks
+from rtt_tools import generator_mpc as ggen
 from rtt_tools.generator_mpc import get_input_key, get_input_size, comp_hw_weight, make_hw_config, HwConfig, \
     comb_cached, rank, HwSpaceTooSmall, generate_cfg_col, StreamOptions, ExpRec, write_submit_obj, generate_cfg_inp, \
     gen_lowmc_core, gen_script_config, MPC_SAGE_PARAMS
@@ -332,7 +333,7 @@ class Cleaner:
             c.execute("""SELECT e.id, name, dp.`provider_config`
                             FROM experiments e
                             JOIN rtt_data_providers dp ON e.data_file_id = dp.id
-                            WHERE e.id >= %s and name LIKE 'PH4-SM-60%%'
+                            WHERE e.id >= %s and name LIKE 'PH4-SM-6%%'
                               """ % (from_id or self.exp_id_low,))
 
             dupes = []
@@ -378,6 +379,96 @@ class Cleaner:
                             msg="Update experiment with ID %s" % eid)
 
             self.conn.commit()
+            logger.info('Finished')
+
+    def aux_mpc_booltest(self, from_id=None, tmpdir='/tmp/rspecs', skip_existing_since=None,
+                        clean_before=False):
+        """
+        Add Booltest blocklens to match spreader sizes
+        """
+        if clean_before and os.path.exists(tmpdir):
+            shutil.rmtree(tmpdir)
+
+        os.makedirs(tmpdir, exist_ok=True)
+
+        agg_scripts = []
+        computed_bools = collections.defaultdict(lambda: set())
+        processed_data = collections.defaultdict()
+        with self.conn.cursor() as c:
+            logger.info("Processing experiments")
+            existing_exps = self._load_existing_exps(c, skip_existing_since)
+
+            c.execute("""SELECT e.id, name, dp.`provider_config`, dc.config_data, dc.config_name
+                            FROM experiments e
+                            JOIN rtt_data_providers dp ON e.data_file_id = dp.id
+                            JOIN rtt_config_files dc ON e.config_file_id = dc.id
+                            WHERE e.id >= %s and name LIKE 'testmpc%%' ORDER BY e.id
+                              """ % (from_id or self.exp_id_low,))
+
+            for result in c.fetchall():
+                eid, name, config, rconfig, rcname = result[0], result[1], result[2], result[3], result[4]
+                if 'rtt_data_gen.spreader' not in config:
+                    continue
+
+                cfg_hash = hashlib.sha256(config.encode('utf8')).hexdigest()
+                m = re.match(r'.*\b(\d+)MB.*', rcname)
+                if not m:
+                    logger.error(f'Could not get exp size {eid}, {name}, {rcname}')
+                    continue
+
+                ssize = 1024 * 1024 * int(m.group(1))
+                rtjs = json.loads(rconfig)
+                cfg1 = rtjs['randomness-testing-toolkit'] if rtjs and 'randomness-testing-toolkit' in rtjs else None
+                cfg2 = cfg1['booltest'] if cfg1 and 'booltest' in cfg1 else None
+                cfg3 = cfg2['strategies'][0]['variations'][0]['bl'] if cfg2 and 'strategies' in cfg2 else None
+
+                m = re.match(r'.*--ob=?(\d+)\b.*', config, flags=re.MULTILINE | re.DOTALL)
+                if not m:
+                    logger.warning(f'Could not parse spr: {eid}, {name}, {config}')
+                    continue
+
+                spr_obits = int(m.group(1))
+
+                s_computed = set(cfg3) if cfg3 else set()
+                computed_bools[cfg_hash] = computed_bools[cfg_hash].union(s_computed)
+                processed_data[cfg_hash] = (ssize, spr_obits, eid, name, config, rtjs)
+
+            for cfg_hash in processed_data.keys():
+                ssize, spr_obits, eid, name, config, rtjs = processed_data[cfg_hash]
+                s_computed = computed_bools[cfg_hash]
+
+                new_bblocks = set(ggen.get_booltest_blocks(spr_obits))
+                to_comp = new_bblocks.difference(s_computed)
+                if len(to_comp) == 0:
+                    continue
+
+                config_obj = ggen.get_rtt_config_file(ssize)
+                booltest_cfg = ggen.booltest_rtt_config(sorted(list(to_comp)))
+                config_obj = ggen.update_booltest_config(config_obj, booltest_cfg)
+                logger.info(f'To compute more for {eid} {name}, block lens {to_comp}, size {ssize}')
+
+                nname = name.replace('.json', '') + '-boolex-' + '-'.join(map(str, to_comp))
+                agg_scripts.append(
+                    ExpRec(ename=nname,
+                           ssize=ssize / 1024 / 1024, fname=nname + '.json',
+                           tpl_file=json.loads(config), cfg_type='rtt-data-gen-config',
+                           cfg_obj=config_obj, batteries=ggen.RttBatteries.BOOLTEST_1 | ggen.RttBatteries.BOOLTEST_2)
+                )
+
+            logger.info(f'Writing submit file, len: {len(agg_scripts)}')
+            agg_filtered = []
+            with open(os.path.join(tmpdir, '__enqueue.sh'), 'w+') as fh:
+                fh.write('#!/bin/bash\n')
+                for crec in agg_scripts:
+                    name_find = self._name_find(crec.ename)
+                    if name_find in existing_exps:
+                        continue
+
+                    logger.info(f'submit: {crec.ename}, {crec.fname}, {crec.ssize} MB')
+                    agg_filtered.append(crec)
+
+            logger.info(f'Submit size: {len(agg_filtered)}')
+            write_submit_obj(agg_filtered, sdir=tmpdir)
             logger.info('Finished')
 
     def fix_tangle(self):
