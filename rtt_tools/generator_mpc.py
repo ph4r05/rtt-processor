@@ -14,6 +14,7 @@ import functools
 import binascii
 import json
 import logging
+import pkgutil
 import coloredlogs
 
 from rtt_tools.gen.max_rounds import FUNC_DB, FuncInfo
@@ -60,6 +61,50 @@ ILENS = {
     'testu01-umrg': 6,  # estimate, precise number is computed from constants
     'testu01-uxorshift': 8 * 4,
 }
+
+
+class RttBatteries:
+    NIST = 1
+    DIEHARDER = 2
+    U01_ALPHABIT = 4
+    U01_SMALLCRUSH = 8
+    U01_RABBIT = 16
+    U01_BLOCK_ALPHA = 32
+    BOOLTEST_1 = 64
+    BOOLTEST_2 = 128
+    ALL = NIST | DIEHARDER | U01_ALPHABIT | U01_SMALLCRUSH | U01_RABBIT | U01_BLOCK_ALPHA | BOOLTEST_1 | BOOLTEST_2
+
+    BAT_MAP = {
+        NIST: '--nist_sts',
+        DIEHARDER: '--dieharder',
+        U01_ALPHABIT: '--tu01_alphabit',
+        U01_SMALLCRUSH: '--tu01_crush',
+        U01_RABBIT: '--tu01_rabbit',
+        U01_BLOCK_ALPHA: '--tu01_blockalphabit',
+        BOOLTEST_1: '--booltest-1',
+        BOOLTEST_2: '--booltest-2',
+    }
+
+    BAT_NAMES = {
+        NIST: 'NIST Statistical Testing Suites',
+        DIEHARDER: 'Dieharder',
+        U01_ALPHABIT: 'TestU01 Alphabit',
+        U01_SMALLCRUSH: 'TestU01 Small Crush',
+        U01_RABBIT: 'TestU01 Rabbit',
+        U01_BLOCK_ALPHA: 'TestU01 Block Alphabit',
+        BOOLTEST_1: 'booltest_1',
+        BOOLTEST_2: 'booltest_2',
+    }
+
+    @staticmethod
+    def has_bat(x, bat):
+        return (x & bat) == bat
+
+    @staticmethod
+    def to_submit(x):
+        if x is None or RttBatteries.has_bat(x, RttBatteries.ALL):
+            return '--all_batteries'
+        return ' '.join([RttBatteries.BAT_MAP[y] for y in RttBatteries.BAT_MAP.keys() if RttBatteries.has_bat(x, y)])
 
 
 class LowmcParams:
@@ -140,12 +185,14 @@ MPC_SAGE_PARAMS = {
 
 
 class ExpRec:
-    def __init__(self, ename, ssize, fname, tpl_file, cfg_type=None):
+    def __init__(self, ename, ssize, fname, tpl_file, cfg_type=None, cfg_obj=None, batteries=None):
         self.ename = ename
         self.ssize = ssize
         self.fname = fname
         self.tpl_file = tpl_file
         self.cfg_type = cfg_type
+        self.cfg_obj = cfg_obj
+        self.batteries = batteries
 
     def __eq__(self, o: object) -> bool:
         return (self.ename, self.ssize, self.fname, self.cfg_type, self.tpl_file) \
@@ -871,13 +918,25 @@ def gen_script_config(to_gen, is_prime=True, data_sizes=None, eprefix=None, stre
         for configs in itertools.product(agg_spreads, agg_inputs):
             inp_name = configs[1][0]
             spread_name = configs[0][0]
+            spread_data = configs[0][1]
+            config_obj = None
 
             inp = configs[1][1]
             seed = inp['seed'] if 'seed' in inp else configs[1][2]
-            cfull_tpl = myformat(full_tpl,
-                                 tpl=ctpl,
-                                 spreader=configs[0][1]
-            )
+            cfull_tpl = myformat(full_tpl, tpl=ctpl, spreader=spread_data)
+
+            # Extract output block sizes from spreader for Booltest param tuning
+            m = re.match(r'.*--ob=?(\d+)\b', spread_data)
+            if m:
+                spr_obits = int(m.group(1))
+                new_bblocks = get_booltest_blocks(spr_obits)
+                if new_bblocks:
+                    config_obj = get_rtt_config_file(max_out)
+                    booltest_cfg = booltest_rtt_config(sorted(list(set(default_booltest_sizes() + new_bblocks))))
+                    config_obj = update_booltest_config(config_obj, booltest_cfg)
+
+            else:
+                logger.error(f'Could not parse spr: {spread_data}')
 
             agg_configs.append((ctpl, inp, cfull_tpl))
             ename = '%s%s-%s-raw-r%s-inp-%s-spr-%s-s%sMB' \
@@ -903,7 +962,7 @@ def gen_script_config(to_gen, is_prime=True, data_sizes=None, eprefix=None, stre
               }
             }
             agg_scripts.append(ExpRec(ename=ename, ssize=max_out / 1024 / 1024, fname=ename + '.json',
-                                      tpl_file=script, cfg_type='rtt-data-gen-config'))
+                                      tpl_file=script, cfg_type='rtt-data-gen-config', cfg_obj=config_obj))
     return agg_scripts
 
 
@@ -1446,8 +1505,107 @@ def write_submit_rec(fh, coff: ExpRec, ix: int, total: int, sdir=None):
     with open(os.path.join(sdir or '', coff.fname), 'w+') as fhc:
         fhc.write(json.dumps(coff.tpl_file, indent=2))
 
+    cfg_path = f'/home/debian/rtt-home/RTTWebInterface/media/predefined_configurations/{int(coff.ssize)}MB.json'
+    if coff.cfg_obj:
+        cfg_path = cfg_name = f'cfg{int(coff.ssize)}MB-{hash_json(coff.cfg_obj)[:8]}.json'
+        with open(os.path.join(sdir or '', cfg_name), 'w+') as fhc:
+            fhc.write(json.dumps(coff.cfg_obj, indent=2))
+
+    batteries_param = RttBatteries.to_submit(coff.batteries)
     fh.write(f"echo '{ix + 1}/{total}'\n")
-    fh.write("submit_experiment --all_batteries "
+    fh.write("submit_experiment %s "
              "--name '%s' "
-             "--cfg '/home/debian/rtt-home/RTTWebInterface/media/predefined_configurations/%sMB.json' "
-             "--%s '%s'\n" % (coff.ename, int(coff.ssize), coff.cfg_type, coff.fname))
+             "--cfg '%s' "
+             "--%s '%s'\n" % (batteries_param, coff.ename, cfg_path, coff.cfg_type, coff.fname))
+
+
+def hash_json(obj):
+    return hashlib.sha256(json.dumps(obj).encode('utf8')).hexdigest()
+
+
+def get_rtt_config_file(size):
+    if size >= 1024*1024*1000:
+        nname = '8000MB'
+    else:
+        nname = f'{int(size/1024/1024)}MB'
+    return json.loads(pkgutil.get_data(__name__, f'configs/{nname}.json'))
+
+
+def default_booltest_sizes():
+    return [128, 256, 384, 512]
+
+
+def booltest_rtt_config(blens=None):
+    return {
+        "strategies": [
+            {
+                "name": "v1",
+                "cli": "",
+                "variations": [
+                    {
+                        "bl": blens or default_booltest_sizes(),
+                        "deg": [1, 2, 3],
+                        "cdeg": [1, 2, 3],
+                        "exclusions": []
+                    }
+                ]
+            },
+            {
+                "name": "halving",
+                "cli": "--halving",
+                "variations": [
+                    {
+                        "bl": blens or default_booltest_sizes(),
+                        "deg": [1, 2, 3],
+                        "cdeg": [1, 2, 3],
+                        "exclusions": []
+                    }
+                ]
+            }
+        ]
+    }
+
+
+def update_booltest_config(cfg_file_jsobj, booltest_config_jsobj):
+    """
+    Sets Booltest configuration to the RTT configuration file
+    """
+    RT_KEY = 'randomness-testing-toolkit'
+    BOOL_KEY = 'booltest'
+    if RT_KEY not in cfg_file_jsobj:
+        cfg_file_jsobj[RT_KEY] = {}
+    if BOOL_KEY not in cfg_file_jsobj[RT_KEY]:
+        cfg_file_jsobj[RT_KEY][BOOL_KEY] = {}
+
+    for k in booltest_config_jsobj:
+        cfg_file_jsobj[RT_KEY][BOOL_KEY][k] = booltest_config_jsobj[k]
+    return cfg_file_jsobj
+
+
+def get_booltest_blocks(obits, factors=(1, 2, 3, 4), max_bits=512):
+    """
+    Compute Booltest block sizes to match obits * factors.
+    """
+    if isinstance(obits, int):
+        obits = [obits]
+
+    new_sizes = set()
+    def_sizes = default_booltest_sizes()
+    for cbit in obits:
+        if cbit in def_sizes:
+            continue
+
+        usable_factors = set([int(x / cbit) for x in def_sizes if x % cbit == 0])
+        for nfactor in factors:
+            if nfactor in usable_factors:
+                continue
+
+            nbit = cbit * nfactor
+            if nbit < 128 or nbit >= max_bits:
+                continue
+
+            new_sizes.add(nbit)
+
+    return sorted(list(new_sizes))
+
+
