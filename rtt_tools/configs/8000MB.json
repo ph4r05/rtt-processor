@@ -1,0 +1,300 @@
+{
+    "randomness-testing-toolkit": {
+        "dieharder-settings": {
+            "defaults": {
+                "test-ids": ["0-4","8-13","15-17","100-102","200-209"],
+                "psamples": 100
+            },
+            "test-specific-settings": [
+                {
+                    "test-id": 200,
+                    "variants": [
+                        { "arguments": "-n 1" },
+                        { "arguments": "-n 2" },
+                        { "arguments": "-n 3" },
+                        { "arguments": "-n 4" },
+                        { "arguments": "-n 5" },
+                        { "arguments": "-n 6" },
+                        { "arguments": "-n 7" },
+                        { "arguments": "-n 8" },
+                        { "arguments": "-n 9" },
+                        { "arguments": "-n 10" },
+                        { "arguments": "-n 11" },
+                        { "arguments": "-n 12" }
+                    ]    
+                },
+                {
+                    "test-id": 201,
+                    "psamples": 1000,
+            		"variants": [
+            		    { "arguments": "-n 2 -t 10000" },
+            		    { "arguments": "-n 3 -t 10000" },
+            		    { "arguments": "-n 4 -t 10000" },
+                        { "arguments": "-n 5 -t 10000" }
+            		]
+                },
+                {
+                    "test-id": 202,
+                    "variants": [
+                        { "arguments": "-n 2" },
+                        { "arguments": "-n 3" },
+                        { "arguments": "-n 4" },
+                        { "arguments": "-n 5" }
+                    ]
+                },
+                {
+                    "test-id": 203,
+                    "variants": [
+                        { "arguments": "-n 0" },
+                        { "arguments": "-n 1" },
+                        { "arguments": "-n 2" },
+                        { "arguments": "-n 3" },
+                        { "arguments": "-n 4" },
+                        { "arguments": "-n 5" },
+                        { "arguments": "-n 6" },
+                        { "arguments": "-n 7" },
+                        { "arguments": "-n 8" },
+                        { "arguments": "-n 9" },
+                        { "arguments": "-n 10" },
+                        { "arguments": "-n 11" },
+                        { "arguments": "-n 12" },
+                        { "arguments": "-n 13" },
+                        { "arguments": "-n 14" },
+                        { "arguments": "-n 15" },
+                        { "arguments": "-n 16" },
+                        { "arguments": "-n 17" },
+                        { "arguments": "-n 18" },
+                        { "arguments": "-n 19" },
+                        { 
+                            "arguments": "-n 20",
+                            "psamples": 99
+                        },
+                        { 
+                            "arguments": "-n 21",
+                            "psamples": 95
+                        },
+                        { 
+                            "arguments": "-n 22",
+                            "psamples": 91
+                        },
+                        { 
+                            "arguments": "-n 23",
+                            "psamples": 87
+                        },
+                        { 
+                            "arguments": "-n 24",
+                            "psamples": 83 
+                        },
+                        { 
+                            "arguments": "-n 25",
+                            "psamples": 80 
+                        },
+                        { 
+                            "arguments": "-n 26",
+                            "psamples": 77 
+                        },
+                        { 
+                            "arguments": "-n 27",
+                            "psamples": 74 
+                        },
+                        { 
+                            "arguments": "-n 28",
+                            "psamples": 72 
+                        },
+                        { 
+                            "arguments": "-n 29",
+                            "psamples": 69 
+                        },
+                        { 
+                            "arguments": "-n 30",
+                            "psamples": 67 
+                        },
+                        { 
+                            "arguments": "-n 31",
+                            "psamples": 65 
+                        },
+                        {
+                            "arguments": "-n 32",
+                            "psamples": 63
+                        }
+                    ]
+                },
+                {
+                    "test-id": 204,
+                    "psamples": 1000
+                },
+                {
+                    "test-id": 205,
+                    "psamples": 1
+                },
+                {
+                    "test-id": 206,
+                    "psamples": 1
+                },
+                {
+                    "test-id": 207,
+                    "psamples": 1
+                },
+                {
+                    "test-id": 208,
+                    "psamples": 1
+                },                
+                {
+                    "test-id": 209,
+                    "psamples": 1
+                }
+            ]
+        },
+    
+        "nist-sts-settings": {
+            "defaults": {
+                "test-ids": ["1-15"],    
+                "stream-size": "1000000",
+                "stream-count": "1000"
+            }
+        },
+    
+        "tu01-smallcrush-settings": {
+            "defaults": {
+                "test-ids": ["1-10"],
+                "repetitions": 1
+            }
+        },
+        
+        "tu01-crush-settings": {
+            "defaults": {
+                "test-ids": ["1-96"],
+                "repetitions": 1
+            }
+        },
+        
+        "tu01-rabbit-settings": {
+            "defaults": {
+                "test-ids": ["1-26"],
+                "repetitions": 1,
+                "bit-nb": "8388608000"
+            }
+        },
+        
+        "tu01-alphabit-settings": {
+            "defaults": {
+                "test-ids": ["1-9"],
+                "repetitions": 1,
+                "bit-nb": "8388608000",
+                "bit-r": "0",
+                "bit-s": "32"
+            }
+        },
+        
+        "tu01-blockalphabit-settings": {
+            "defaults": {
+                "test-ids": ["1-9"],
+                "repetitions": 1,
+                "bit-nb": "8388608000",
+                "bit-r": "0",
+                "bit-s": "32"
+            },
+            "test-specific-settings": [
+                {
+                    "test-id": 1,
+                    "variants": [
+                        { "bit-w": "1" },
+                        { "bit-w": "2" },
+                        { "bit-w": "4" },
+                        { "bit-w": "8" },
+                        { "bit-w": "16" },
+                        { "bit-w": "32" }
+                    ]
+                },
+                {
+                    "test-id": 2,
+                    "variants": [
+                        { "bit-w": "1" },
+                        { "bit-w": "2" },
+                        { "bit-w": "4" },
+                        { "bit-w": "8" },
+                        { "bit-w": "16" },
+                        { "bit-w": "32" }
+                    ]
+                },
+                {
+                    "test-id": 3,
+                    "variants": [
+                        { "bit-w": "1" },
+                        { "bit-w": "2" },
+                        { "bit-w": "4" },
+                        { "bit-w": "8" },
+                        { "bit-w": "16" },
+                        { "bit-w": "32" }
+                    ]
+                },
+                {
+                    "test-id": 4,
+                    "variants": [
+                        { "bit-w": "1" },
+                        { "bit-w": "2" },
+                        { "bit-w": "4" },
+                        { "bit-w": "8" },
+                        { "bit-w": "16" },
+                        { "bit-w": "32" }
+                    ]
+                },
+                {
+                    "test-id": 5,
+                    "variants": [
+                        { "bit-w": "1" },
+                        { "bit-w": "2" },
+                        { "bit-w": "4" },
+                        { "bit-w": "8" },
+                        { "bit-w": "16" },
+                        { "bit-w": "32" }
+                    ]
+                },
+                {
+                    "test-id": 6,
+                    "variants": [
+                        { "bit-w": "1" },
+                        { "bit-w": "2" },
+                        { "bit-w": "4" },
+                        { "bit-w": "8" },
+                        { "bit-w": "16" },
+                        { "bit-w": "32" }
+                    ]
+                },
+                {
+                    "test-id": 7,
+                    "variants": [
+                        { "bit-w": "1" },
+                        { "bit-w": "2" },
+                        { "bit-w": "4" },
+                        { "bit-w": "8" },
+                        { "bit-w": "16" },
+                        { "bit-w": "32" }
+                    ]
+                },
+                {
+                    "test-id": 8,
+                    "variants": [
+                        { "bit-w": "1" },
+                        { "bit-w": "2" },
+                        { "bit-w": "4" },
+                        { "bit-w": "8" },
+                        { "bit-w": "16" },
+                        { "bit-w": "32" }
+                    ]
+                },
+                {
+                    "test-id": 9,
+                    "variants": [
+                        { "bit-w": "1" },
+                        { "bit-w": "2" },
+                        { "bit-w": "4" },
+                        { "bit-w": "8" },
+                        { "bit-w": "16" },
+                        { "bit-w": "32" }
+                    ]
+                }
+            ]
+        }
+    }
+}
