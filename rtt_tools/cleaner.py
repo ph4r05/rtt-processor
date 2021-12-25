@@ -452,7 +452,7 @@ class Cleaner:
                     ExpRec(ename=nname,
                            ssize=ssize / 1024 / 1024, fname=nname + '.json',
                            tpl_file=json.loads(config), cfg_type='rtt-data-gen-config',
-                           cfg_obj=config_obj, batteries=ggen.RttBatteries.BOOLTEST_1 | ggen.RttBatteries.BOOLTEST_2)
+                           cfg_obj=config_obj, batteries=ggen.RttBatteries.BOOLTEST_2)
                 )
 
             logger.info(f'Writing submit file, len: {len(agg_scripts)}')
