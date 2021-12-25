@@ -471,6 +471,37 @@ class Cleaner:
             write_submit_obj(agg_filtered, sdir=tmpdir)
             logger.info('Finished')
 
+    def fix_booltest_runs(self, from_id=None):
+        """Fixes Booltest runs with 0 total tests"""
+        with self.conn.cursor() as c:
+            logger.info("Processing experiments")
+
+            c.execute("""SELECT j.id, j.battery, e.id, e.name, b.id, b.name, b.total_tests
+                            FROM jobs j
+                            JOIN experiments e on e.id = j.experiment_id
+                            LEFT JOIN batteries b ON b.job_id = j.id
+                            WHERE e.id >= %s AND j.status = 'finished' AND j.battery LIKE 'booltest%%' 
+                            AND (b.total_tests is NULL OR b.total_tests = 0)
+                            ORDER BY e.id
+                              """ % (from_id or self.exp_id_low,))
+
+            for result in c.fetchall():
+                jid, jbat, eid, ename, bid, bname, btotal = result[0:7]
+
+                if btotal == 0:
+                    sql_exps = 'DELETE FROM batteries WHERE id=%s'
+                    try_execute(lambda: c.execute(sql_exps, (bid,)),
+                                msg="Delete battery with ID %s" % bid)
+
+                if btotal is not None and btotal > 0:
+                    continue
+
+                sql_exps = 'UPDATE jobs SET status="pending" WHERE id=%s'
+                try_execute(lambda: c.execute(sql_exps, (jid,)),
+                            msg="Update job with ID %s" % jid)
+
+        self.conn.commit()
+
     def fix_tangle(self):
         """Tangle experiments were mislabeled, just fix the name"""
         with self.conn.cursor() as c:
