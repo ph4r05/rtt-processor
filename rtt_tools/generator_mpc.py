@@ -171,6 +171,15 @@ MPC_SAGE_PARAMS = {
     'Vision_S128b': MpcSageParams('Vision_S128b', 'Bin255', (26,), 'vision.sage'),
     'Vision_S128d': MpcSageParams('Vision_S128d', 'Bin63', (10,), 'vision.sage'),
 
+    'RescueP_S80a': MpcSageParams('RescueP_S80a', 'F91', (18,), 'rescue_prime.sage'),
+    'RescueP_S80b': MpcSageParams('RescueP_S80b', 'F253', (18,), 'rescue_prime.sage'),
+    'RescueP_S80c': MpcSageParams('RescueP_S80c', 'F91', (9,), 'rescue_prime.sage'),
+    'RescueP_S80d': MpcSageParams('RescueP_S80d', 'F253', (9,), 'rescue_prime.sage'),
+    'RescueP_128a': MpcSageParams('RescueP_128a', 'F91', (27,), 'rescue_prime.sage'),
+    'RescueP_128b': MpcSageParams('RescueP_128b', 'F253', (27,), 'rescue_prime.sage'),
+    'RescueP_128c': MpcSageParams('RescueP_128c', 'F91', (14,), 'rescue_prime.sage'),
+    'RescueP_128d': MpcSageParams('RescueP_128d', 'F253', (14,), 'rescue_prime.sage'),
+
     'S45a': MpcSageParams('S45a', 'F91', (121,), 'gmimc.sage'),
     'S45b': MpcSageParams('S45b', 'F91', (137,), 'gmimc.sage'),
     'S80a': MpcSageParams('S80a', 'F81', (111,), 'gmimc.sage'),
@@ -988,6 +997,47 @@ def gen_lowmc(data_sizes=None, eprefix=None, streams=StreamOptions.CTR_LHW):
 
 def subs_mpc_stream(sname, addition):
     return re.sub(r'^(.+?)(\d+)(.+)$', '\\1\\2{{HERE}}\\3', sname).replace('{{HERE}}', addition)
+
+
+def generate_mpc_cfg(algorithm, data_size, cround=1, has_key_prim=False, nexps=3,
+                     eprefix='', streams=StreamOptions.CTR_LHW, inp_stream=StreamOptions.ZERO, randomize_seed=False):
+    fname_params = algorithm.replace('gmimc-', '').replace('mimc_hash-', '')
+    if fname_params not in MPC_SAGE_PARAMS:
+        raise ValueError(f'Unknown MPC function {algorithm}, no parameters')
+
+    rnd_list = [cround] if isinstance(cround, int) else cround
+    params = MPC_SAGE_PARAMS[fname_params]
+    to_gen_tpl = [fname_params, params.field, params.full_rounds, params.script, params.round_tpl,
+                  [(x,) for x in rnd_list]]
+
+    if algorithm.startswith('Poseidon'):
+        to_gen_tpl[-1] = [(r, 0, 0) for r in rnd_list]
+    elif algorithm.startswith('Starkad'):
+        to_gen_tpl[-1] = [(r, 0, 0) for r in rnd_list]
+    elif algorithm.startswith('RescueP'):
+        pass
+    elif algorithm.startswith('Rescue'):
+        pass
+    elif algorithm.startswith('Vision'):
+        pass
+    elif algorithm.startswith('gmimc'):
+        pass
+    elif algorithm.startswith('mimc'):
+        pass
+    else:
+        raise ValueError(f'Unknown MPC function {algorithm}')
+
+    if has_key_prim:
+        raise ValueError(f'.key not supported for {algorithm}')
+    if nexps != 3:
+        raise ValueError(f'generate_mpc_cfg currently supports only nexps=3')
+
+    dsizes = [data_size] if isinstance(data_size, int) else data_size
+    return gen_script_config(
+        [to_gen_tpl], params.is_prime(), data_sizes=dsizes,
+        eprefix=eprefix, streams=streams,
+        use_as_key=has_key_prim, other_stream=inp_stream,
+        randomize_seed=randomize_seed)
 
 
 def build_aux_stream_desc(other_stream, other_stream_type):

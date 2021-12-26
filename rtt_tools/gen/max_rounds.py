@@ -274,6 +274,15 @@ FUNC_DB.add_all([
     FuncInfo('Rescue_S256b', FuncInfo.CIPHER, FuncInfo.MPC, 10, None),
     FuncInfo('Vision_S256b', FuncInfo.CIPHER, FuncInfo.MPC, 10, None),
 
+    FuncInfo('RescueP_S80a', FuncInfo.CIPHER, FuncInfo.MPC, 18, None),
+    FuncInfo('RescueP_S80b', FuncInfo.CIPHER, FuncInfo.MPC, 18, None),
+    FuncInfo('RescueP_S80c', FuncInfo.CIPHER, FuncInfo.MPC, 9, None),
+    FuncInfo('RescueP_S80d', FuncInfo.CIPHER, FuncInfo.MPC, 9, None),
+    FuncInfo('RescueP_128a', FuncInfo.CIPHER, FuncInfo.MPC, 27, None),
+    FuncInfo('RescueP_128b', FuncInfo.CIPHER, FuncInfo.MPC, 27, None),
+    FuncInfo('RescueP_128c', FuncInfo.CIPHER, FuncInfo.MPC, 14, None),
+    FuncInfo('RescueP_128d', FuncInfo.CIPHER, FuncInfo.MPC, 14, None),
+
     FuncInfo('std_mersenne_twister', FuncInfo.PRNG, max_rounds=0, key_size=4, block_size=4),
     FuncInfo('std_lcg', FuncInfo.PRNG, max_rounds=0, key_size=4, block_size=4),
     FuncInfo('std_subtract_with_carry', FuncInfo.PRNG, max_rounds=0, key_size=4, block_size=4),
