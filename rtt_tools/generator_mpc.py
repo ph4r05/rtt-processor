@@ -1593,7 +1593,7 @@ def booltest_rtt_config(blens=None):
                 "cli": "",
                 "variations": [
                     {
-                        "bl": blens or default_booltest_sizes(),
+                        "bl": default_booltest_sizes(),
                         "deg": [1, 2, 3],
                         "cdeg": [1, 2, 3],
                         "exclusions": []
