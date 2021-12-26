@@ -485,3 +485,123 @@ for fname, tv_size, osize in itertools.product(prngs, tv_sizes, osizes):
 g.write_submit_obj(rr)
 ```
 
+# RC4 more
+
+```python
+import os, shutil, itertools
+from rtt_tools import generator_mpc as g
+dname = '/tmp/ggen42'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]
+
+rr += g.generate_stream_col('RC4', 1000*1024*1024, 1, eprefix='PH4-SM-42-', streams=g.StreamOptions.SAC_RND)
+g.write_submit_obj(rr)
+```
+
+# TEA more
+
+```python
+import os, shutil, itertools
+from rtt_tools import generator_mpc as g
+dname = '/tmp/ggen48'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]
+
+rr += list(itertools.chain.from_iterable(
+    [g.generate_block_col('TEA', 10*1024*1024, r, eprefix='PH4-SM-48-', streams=g.StreamOptions.LHW) for r in range(27, 33)]))
+rr += list(itertools.chain.from_iterable(
+    [g.generate_block_col('TEA', 100*1024*1024, r, eprefix='PH4-SM-48-', streams=g.StreamOptions.LHW) for r in range(27, 33)]))
+g.write_submit_obj(rr)
+```
+
+# LowMC SAC
+
+```python
+import os, shutil
+from rtt_tools import generator_mpc as g
+dname = '/tmp/ggen56'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]
+
+to_gen = [
+    ('lowmc-s80a', (None, ), [1, 2, 3, 4]),
+    ('lowmc-s80b', (None, ), [1, 2, 3, 4, 5]),
+    ('lowmc-s128a', (None, ), [1, 2, 3, 4, 5]),
+    ('lowmc-s128b', (None, ), list(range(1, 21)) + [50, 90, 120, 150, 180, 210]),
+    ('lowmc-s128c', (None, ), list(range(1, 21)) + [30, 40, 50, 60, 70, 90, 110]),
+    ('lowmc-s128d', (None, ), list(range(1, 16)) + [40, 50, 60, 80, 100, 120, 140]),
+]
+
+rr += g.gen_lowmc_core(to_gen, [10 * 1024 * 1024, 100 * 1024 * 1024], eprefix='testmpc56-', streams=g.StreamOptions.SAC)
+g.write_submit_obj(rr)
+```
+
+# LowMC key variant
+
+```python
+import os, shutil
+from rtt_tools import generator_mpc as g
+dname = '/tmp/ggen57'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]
+
+to_gen = [
+    ('lowmc-s80a', (None, ), [1, 2, 3, 4]),
+    ('lowmc-s80b', (None, ), [1, 2, 3, 4, 5]),
+    ('lowmc-s128a', (None, ), [1, 2, 3, 4, 5]),
+    ('lowmc-s128b', (None, ), list(range(1, 21)) + [50, 90, 120, 150, 180, 210]),
+    ('lowmc-s128c', (None, ), list(range(1, 21)) + [30, 40, 50, 60, 70, 90, 110]),
+    ('lowmc-s128d', (None, ), list(range(1, 16)) + [40, 50, 60, 80, 100, 120, 140]),
+]
+
+rr += g.gen_lowmc_core(to_gen, [10 * 1024 * 1024, 100 * 1024 * 1024], eprefix='testmpc57-', streams=g.StreamOptions.CTR_LHW_SAC_RND, use_as_key=True)
+g.write_submit_obj(rr)
+```
+
+# Other MPCs SAC
+
+```python
+import os, shutil
+from rtt_tools import generator_mpc as g
+dname = '/tmp/ggen58'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]
+
+data_sizes = [10 * 1024 * 1024, 100 * 1024 * 1024]
+eprefix = 'testmpc58-'
+rr += g.gen_posseidon(data_sizes, eprefix, streams=g.StreamOptions.SAC) \
+           + g.gen_starkad(data_sizes, eprefix, streams=g.StreamOptions.SAC) \
+           + g.gen_rescue(data_sizes, eprefix, streams=g.StreamOptions.SAC) \
+           + g.gen_vision(data_sizes, eprefix, streams=g.StreamOptions.SAC) \
+           + g.gen_gmimc(data_sizes, eprefix, streams=g.StreamOptions.SAC) \
+           + g.gen_mimc(data_sizes, eprefix, streams=g.StreamOptions.SAC)
+
+g.write_submit_obj(rr)
+```
+
+# Rescue prime
+
+```python
+import os, shutil, itertools
+from rtt_tools import generator_mpc as g
+dname = '/tmp/ggen63'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]
+
+data_sizes = [10 * 1024 * 1024, 100 * 1024 * 1024]
+eprefix = 'testmpc63-'
+funcs = ['RescueP_S80a', 'RescueP_S80b', 'RescueP_S80c', 'RescueP_S80d', 'RescueP_128a', 'RescueP_128b', 'RescueP_128c', 'RescueP_128d']
+rounds = [1, 2, 3]
+
+rr += list(itertools.chain.from_iterable(
+    [g.generate_mpc_cfg(f, data_sizes, r, eprefix=eprefix, streams=g.StreamOptions.CTR_LHW_SAC) for f, r in itertools.product(funcs, rounds)]))
+
+g.write_submit_obj(rr)
+```
+
