@@ -1213,8 +1213,8 @@ def get_single_stream(stream, bsize=None, offset=None, tv_count=None, weight=Non
         return {"type": "false_stream"}
     elif StreamOptions.has_sac(stream):
         return {"type": "sac"}
-    # elif StreamOptions.has_ctr(stream):  # TODO: fix, return core counter
-    #     return make_ctr_config(bsize, offset=int_to_hex(offset, 1), tv_count=tv_count, core_only=True)
+    elif StreamOptions.has_ctr(stream):
+         return make_ctr_config(bsize, offset=int_to_hex(offset, 1), tv_count=tv_count, core_only=True)
     elif StreamOptions.has_lhw(stream):
         weight = weight if weight else comp_hw_weight(bsize, samples=nsamples or 1, min_samples=tv_count)
         return make_hw_config(bsize, weight=weight, offset_range=offset / float(nsamples or 1),
