@@ -41,6 +41,10 @@ class RttDumpTest(unittest.TestCase):
         self.assertEqual(r.fnc, 'AES')
         self.assertEqual(r.osize, 1000 * 1024 * 1024)
 
+        r = l.break_exp_ph4('PH4-SM-59-XTEA-t:block-r:2-b:8-s:10MiB-e:2-i:sac.key..ornd.inp-128sbit-offset-2')
+        self.assertEqual(r.fnc, 'XTEA')
+        self.assertEqual(r.osize, 10 * 1024 * 1024)
+
     def test_mpc(self):
         l = Loader()
         r1 = l.break_exp_ph4_mpc('testmpc02-lowmc-s128b-bin-raw-r6-inp-ctr00-b16-spr--s100MB.json')
@@ -67,6 +71,12 @@ class RttDumpTest(unittest.TestCase):
         r6 = l.break_exp_ph4_mpc('mimc_hash-testmpc01-S45-pri-raw-r2-inp-ctr01-b11-spr-s6ob-s100MB.json')
         self.assertEqual(r6.fnc, 'mimc_hash-S45')
         self.assertEqual(r6.osize, 104857600)
+
+        r = l.break_exp_ph4_mpc('testmpc63-RescueP_128d-pri-raw-r3-inp-lhw01-b31-w4-spr-s16mb1-s100MB')
+        self.assertEqual(r.osize, 104857600)
+
+        r = l.break_exp_ph4_mpc('testmpc58-S80-pri-raw-r1-inp-sac00-b20-spr-s15mb-s100MB-boolex-162-324-486')
+        self.assertEqual(r.osize, 104857600)
 
 
 if __name__ == "__main__":
