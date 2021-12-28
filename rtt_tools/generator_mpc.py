@@ -194,7 +194,8 @@ MPC_SAGE_PARAMS = {
 
 
 class ExpRec:
-    def __init__(self, ename, ssize, fname, tpl_file, cfg_type=None, cfg_obj=None, batteries=None):
+    def __init__(self, ename, ssize, fname, tpl_file, cfg_type=None, cfg_obj=None, batteries=None,
+                 exp_data_size=None, priority=None):
         self.ename = ename
         self.ssize = ssize
         self.fname = fname
@@ -202,6 +203,8 @@ class ExpRec:
         self.cfg_type = cfg_type
         self.cfg_obj = cfg_obj
         self.batteries = batteries
+        self.exp_data_size = exp_data_size
+        self.priority = priority
 
     def __eq__(self, o: object) -> bool:
         return (self.ename, self.ssize, self.fname, self.cfg_type, self.tpl_file) \
@@ -971,7 +974,8 @@ def gen_script_config(to_gen, is_prime=True, data_sizes=None, eprefix=None, stre
               }
             }
             agg_scripts.append(ExpRec(ename=ename, ssize=max_out / 1024 / 1024, fname=ename + '.json',
-                                      tpl_file=script, cfg_type='rtt-data-gen-config', cfg_obj=config_obj))
+                                      tpl_file=script, cfg_type='rtt-data-gen-config', cfg_obj=config_obj,
+                                      exp_data_size=max_out))
     return agg_scripts
 
 
@@ -1180,7 +1184,8 @@ def gen_lowmc_core(to_gen, data_sizes=None, eprefix=None, streams=StreamOptions.
                 }
             }
             agg_scripts.append(ExpRec(ename=ename, ssize=max_out / 1024 / 1024, fname=ename + '.json',
-                                      tpl_file=script, cfg_type='rtt-data-gen-config'))
+                                      tpl_file=script, cfg_type='rtt-data-gen-config',
+                                      exp_data_size=max_out))
     return agg_scripts
 
 
@@ -1399,7 +1404,8 @@ def generate_cfg_col(alg_type, algorithm, data_size, cround=1, tv_size=None, key
                 "seeder": key_config
             }
 
-        agg_scripts.append(ExpRec(ename=note, ssize=size_mbs, fname=fname, tpl_file=tpl, cfg_type='cryptostreams-config'))
+        agg_scripts.append(ExpRec(ename=note, ssize=size_mbs, fname=fname, tpl_file=tpl,
+                                  cfg_type='cryptostreams-config', exp_data_size=size_mbs * 1024 * 1024))
     return agg_scripts
 
 
@@ -1525,13 +1531,15 @@ def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=None, key
         if is_stream or is_hash:
             tpl['stream']['generator'] = "pcg32"
 
-        agg_scripts.append(ExpRec(ename=note, ssize=size_mbs, fname=fname, tpl_file=tpl, cfg_type='cryptostreams-config'))
+        agg_scripts.append(ExpRec(ename=note, ssize=size_mbs, fname=fname, tpl_file=tpl,
+                                  cfg_type='cryptostreams-config', exp_data_size=size_mbs * 1024 * 1024))
     return agg_scripts
 
 
 def write_submit(data, cfg_type='rtt-data-gen-config'):
     ndata = [
-        ExpRec(ename=x[0], ssize=int(x[1]), fname='%s.json' % x[0], tpl_file=x[2], cfg_type=cfg_type) for x in data
+        ExpRec(ename=x[0], ssize=int(x[1]), fname='%s.json' % x[0], tpl_file=x[2], cfg_type=cfg_type,
+               exp_data_size=int(x[1]) * 1024 * 1024) for x in data
     ]
     return write_submit_obj(ndata)
 
@@ -1561,12 +1569,19 @@ def write_submit_rec(fh, coff: ExpRec, ix: int, total: int, sdir=None):
         with open(os.path.join(sdir or '', cfg_name), 'w+') as fhc:
             fhc.write(json.dumps(coff.cfg_obj, indent=2))
 
+    aux_params = ''
+    if coff.exp_data_size is not None:
+        aux_params += ' --exp-data-size %s' % coff.exp_data_size
+
+    if coff.priority is not None:
+        aux_params += ' --priority %s' % coff.priority
+
     batteries_param = RttBatteries.to_submit(coff.batteries)
     fh.write(f"echo '{ix + 1}/{total}'\n")
     fh.write("submit_experiment %s "
              "--name '%s' "
-             "--cfg '%s' "
-             "--%s '%s'\n" % (batteries_param, coff.ename, cfg_path, coff.cfg_type, coff.fname))
+             "--cfg '%s' %s "
+             "--%s '%s'\n" % (batteries_param, coff.ename, cfg_path, aux_params, coff.cfg_type, coff.fname))
 
 
 def hash_json(obj):
