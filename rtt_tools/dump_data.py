@@ -934,11 +934,11 @@ class Loader:
         return ei
 
     def break_exp_ph4_mpc(self, s):
-        m = re.match(r'^(?:([\w]+)-)?testmpc([\d])+-([\w-]+?)-r(?:([\w]+?)|([\d]-[\d]-[\d]))-inp-([\w]+?)(\d+)-b([\w]+?)(?:-w([\w]+?))?-spr-([\w]*)-s([\w]+)(.+?)?$', s)
+        m = re.match(r'^(?:([\w]+)-)?testmpc([\d])+-([\w-]+?)-r(?:([\w]+?)|([\d]-[\d]-[\d]))-inp-([\w]+?)(\d+)([.\w]+?)?-b([\w]+?)(?:-w([\w]+?))?-spr-([\w]*)-s([\w]+)(.+?)?$', s)
         if m is None:
             return ExpInfo()
 
-        psize = m.group(11)
+        psize = m.group(12)
         if psize == '10MB':
             psize = 1024*1024*10
         elif psize == '100MB':
@@ -962,12 +962,17 @@ class Loader:
         rc1 = m.group(4)
         rc2 = m.group(5)
         rc = int(rc1) if rc1 is not None and rc1 != 'x' else rc2
-        ei = ExpInfo(eid=int(m.group(7)), meth=m.group(6), seed=None, osize=psize, size=psize,
+        meth = m.group(6)
+        meth_ext = m.group(8)
+        if meth_ext:
+            meth += meth_ext
+
+        ei = ExpInfo(eid=int(m.group(7)), meth=meth, seed=None, osize=psize, size=psize,
                      fnc=fnc, fnc_name=fnc,
                      fnc_round=rc,
-                     fnc_block=int(m.group(8)) if m.group(8) else None,
+                     fnc_block=int(m.group(9)) if m.group(9) else None,
                      fnc_type=None,
-                     spread=m.group(10),
+                     spread=m.group(11),
                      otype=otype)
         return ei
 

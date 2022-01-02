@@ -78,6 +78,14 @@ class RttDumpTest(unittest.TestCase):
         r = l.break_exp_ph4_mpc('testmpc58-S80-pri-raw-r1-inp-sac00-b20-spr-s15mb-s100MB-boolex-162-324-486')
         self.assertEqual(r.osize, 104857600)
 
+        r = l.break_exp_ph4_mpc('testmpc57-lowmc-s128d-bin-raw-r6-inp-ctr01.key-b16-spr--s10MB')
+        self.assertEqual(r.osize, 10485760)
+        self.assertEqual(r.meth, 'ctr.key')
+
+        r = l.break_exp_ph4_mpc('testmpc57-lowmc-s128d-bin-raw-r6-inp-ctr01.key..hw.inp-b16-spr--s10MB')
+        self.assertEqual(r.osize, 10485760)
+        self.assertEqual(r.meth, 'ctr.key..hw.inp')
+
 
 if __name__ == "__main__":
     unittest.main()  # pragma: no cover
