@@ -1589,7 +1589,9 @@ def hash_json(obj):
 
 
 def get_rtt_config_file(size):
-    if size >= 1024*1024*1000:
+    if 1024*1024*1000 < size < 1024*1024*7000:
+        nname = '1000MB'
+    elif size >= 1024*1024*8000:
         nname = '8000MB'
     else:
         nname = f'{int(size/1024/1024)}MB'

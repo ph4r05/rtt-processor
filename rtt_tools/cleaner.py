@@ -932,7 +932,7 @@ class Cleaner:
                 fh.write(f"submit_experiment --all_batteries --name '{nname}' --cfg '/home/debian/rtt-home/RTTWebInterface/media/predefined_configurations/{ssize}MB.json' {ptype} '{fname}'\n")
 
     def comp_new_rounds_new(self, specs, tmpdir='/tmp/rspecs', smidx=5, skip_existing_since=None, new_size=None,
-                            clean_before=False, randomize_seed=False):
+                            clean_before=False, randomize_seed=False, skip_mpc=False, skip_large=False):
         """
         Generates submit_experiment for a new rounds to compute.
         specs is: ftype:fname -> meth:size -> [rounds]
@@ -944,6 +944,7 @@ class Cleaner:
         os.makedirs(tmpdir, exist_ok=True)
 
         eprefix = 'PH4-SM-%02d-' % smidx
+        eprefix_mpc = 'testmpc%02d-' % smidx
         agg_scripts = []  # type: list[ExpRec]
         with self.conn.cursor() as c:
             existing_exps = self._load_existing_exps(c, skip_existing_since)
@@ -957,8 +958,12 @@ class Cleaner:
                     continue
 
                 if erec.stype == FuncInfo.MPC:
-                    mpc_res = self.comp_mpc(erec, ftypename, specs[ftypename], eprefix, randomize_seed)
+                    if skip_mpc:
+                        continue
+                    mpc_res = self.comp_mpc(erec, ftypename, specs[ftypename], eprefix_mpc, randomize_seed)  # type: Optional[List[ExpRec]]
                     if mpc_res:
+                        for x in mpc_res:
+                            x.priority = 50
                         agg_scripts += mpc_res
                     continue
 
@@ -1031,6 +1036,10 @@ class Cleaner:
                 name_find = self._name_find(crec.ename)
                 if name_find in existing_exps:
                     continue
+                if skip_large and crec.ssize >= 1000:
+                    continue
+                if crec.ssize >= 1000:
+                    crec.priority = 100
 
                 logger.info(f'submit: {crec.ename}, {crec.fname}, {crec.ssize} MB')
                 agg_filtered.append(crec)
