@@ -269,9 +269,12 @@ class Exporter:
         res = process_syso(loader.tests)
         self.res = res
 
-        logger.info("Dumping to json to: %s" % fname)
+        fname_tmp = f'{fname}.tmp.{random.randint(0, 65535)}'
+        logger.info("Dumping to json to: %s" % fname_tmp)
         rpath = os.path.join(base_path, fname)
+        rpath_tmp = os.path.join(base_path, fname_tmp)
         self.fname = rpath
 
-        json.dump(res, open(rpath, 'w+'), indent=2)
+        json.dump(res, open(rpath_tmp, 'w+'), indent=2)
+        os.rename(rpath_tmp, rpath)
 
