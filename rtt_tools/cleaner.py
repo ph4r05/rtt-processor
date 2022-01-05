@@ -946,6 +946,10 @@ class Cleaner:
         eprefix = 'PH4-SM-%02d-' % smidx
         eprefix_mpc = 'testmpc%02d-' % smidx
         agg_scripts = []  # type: list[ExpRec]
+
+        num_skip_already_done = 0
+        num_skip_size = 0
+        num_skip_mpc = 0
         with self.conn.cursor() as c:
             existing_exps = self._load_existing_exps(c, skip_existing_since)
             for ftypename in specs.keys():
@@ -959,6 +963,7 @@ class Cleaner:
 
                 if erec.stype == FuncInfo.MPC:
                     if skip_mpc:
+                        num_skip_mpc += 1
                         continue
                     mpc_res = self.comp_mpc(erec, ftypename, specs[ftypename], eprefix_mpc, randomize_seed)  # type: Optional[List[ExpRec]]
                     if mpc_res:
@@ -1035,8 +1040,10 @@ class Cleaner:
             for crec in agg_scripts:
                 name_find = self._name_find(crec.ename)
                 if name_find in existing_exps:
+                    num_skip_already_done += 1
                     continue
                 if skip_large and crec.ssize >= 1000:
+                    num_skip_size += 1
                     continue
                 if crec.ssize >= 1000:
                     crec.priority = 100
@@ -1044,7 +1051,8 @@ class Cleaner:
                 logger.info(f'submit: {crec.ename}, {crec.fname}, {crec.ssize} MB')
                 agg_filtered.append(crec)
 
-        logger.info(f'Submit size: {len(agg_filtered)}')
+        logger.info(f'Submit size: {len(agg_filtered)}, skip done: {num_skip_already_done}, skip size: {num_skip_size}'
+                    f', skip mpc: {num_skip_mpc}')
         write_submit_obj(agg_filtered, sdir=tmpdir)
 
     def comp_mpc(self, erec: FuncInfo, ftypename: str, specs, eprefix=None, randomize_seed=False):
