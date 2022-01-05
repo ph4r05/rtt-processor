@@ -325,7 +325,7 @@ class Cleaner:
             self.conn.commit()
             logger.info('Experiment %s solved' % (eid,))
 
-    def fix_mpc_dups(self, from_id=None):
+    def fix_mpc_dups(self, from_id=None, dry_run=False):
         """Filter MPC duplicates"""
         with self.conn.cursor() as c:
             logger.info("Processing experiments")
@@ -333,7 +333,8 @@ class Cleaner:
             c.execute("""SELECT e.id, name, dp.`provider_config`
                             FROM experiments e
                             JOIN rtt_data_providers dp ON e.data_file_id = dp.id
-                            WHERE e.id >= %s and name LIKE 'PH4-SM-6%%'
+                            WHERE e.id >= %s 
+                            AND (name LIKE 'PH4-SM-%%' OR name LIKE 'testmpc%%')
                               """ % (from_id or self.exp_id_low,))
 
             dupes = []
@@ -352,6 +353,8 @@ class Cleaner:
             for eids in chunks([str(x[0]) for x in dupes], 20):
                 sql_exps = f'DELETE FROM jobs WHERE experiment_id IN ({",".join(eids)})'
                 print(f'Deleting jobs for {eids} duplicate')
+                if dry_run:
+                    continue
                 try_execute(lambda: c.execute(sql_exps, ()),
                             msg=f"Delete jobs for experiment with IDs {eids}")
             self.conn.commit()
@@ -359,6 +362,8 @@ class Cleaner:
             for eids in chunks([str(x[0]) for x in dupes], 20):
                 sql_exps = f'UPDATE experiments SET status="finished" WHERE id IN ({",".join(eids)})'
                 print(f'finishing {eids} duplicate')
+                if dry_run:
+                    continue
                 try_execute(lambda: c.execute(sql_exps, (eid,)),
                             msg=f"update experiment with ID {eids}")
             self.conn.commit()
@@ -366,15 +371,23 @@ class Cleaner:
             for eids in chunks([str(x[0]) for x in dupes], 20):
                 sql_exps = f'DELETE FROM experiments WHERE id IN ({",".join(eids)})'
                 print(f'Deleting {eids} duplicate')
+                if dry_run:
+                    continue
                 try_execute(lambda: c.execute(sql_exps, ()),
                             msg=f"Delete experiments with IDs {eids}")
                 self.conn.commit()
 
             for name in enames:
+                is_mpc = '-spr-' in name and '-raw-' in name
+                if not is_mpc or not name.startswith('PH4-SM-'):
+                    continue
+
                 eid = enames[name]
                 nname = re.sub(r'^PH4-SM-([\d]+)-', 'testmpc\\1-', name)
                 sql_exps = 'UPDATE experiments SET name=%s WHERE id=%s'
                 print(f'Updating {eid} to {nname}')
+                if dry_run:
+                    continue
                 try_execute(lambda: c.execute(sql_exps, (nname, eid,)),
                             msg="Update experiment with ID %s" % eid)
 
