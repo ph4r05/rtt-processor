@@ -520,6 +520,48 @@ class Cleaner:
 
         self.conn.commit()
 
+    def fix_incorrect_sizes(self, from_id=None, dry_run=False):
+        """Delete all computed data that have less data computed """
+        with self.conn.cursor() as c:
+            logger.info("Processing experiments")
+
+            c.execute("""SELECT e.id AS eid, e.name AS ename, e.data_file_size, e.expected_data_file_size, e.run_started
+                            FROM experiments e 
+                            WHERE e.id >= %s AND e.status = 'finished' AND
+                             e.expected_data_file_size IS NOT NULL AND e.data_file_size IS NOT NULL AND
+                             e.data_file_size != e.expected_data_file_size
+                            ORDER BY e.id DESC
+                              """ % (from_id or self.exp_id_low,))
+
+            for result in c.fetchall():
+                eid, ename, fsize, exp_fsize, tstart = result[0], result[1], int(result[2]), int(result[3]), result[4]
+                diff = abs(exp_fsize - fsize)
+                rtio = diff / float(exp_fsize)
+                if fsize == exp_fsize:
+                    continue
+
+                if rtio <= 0.05:
+                    # logger.info(f'File size mismatch, tolerable: {fsize} vs exp {exp_fsize}, diff {rtio}, '
+                    #             f'eid {eid} {ename}')
+                    continue
+
+                logger.info(f'File size mismatch, {fsize} vs exp {exp_fsize}, diff {rtio}, eid {eid} {ename} {tstart}')
+                if dry_run:
+                    continue
+
+                sql_exps = 'DELETE FROM batteries WHERE experiment_id=%s'
+                try_execute(lambda: c.execute(sql_exps, (eid,)), msg="Delete battery results for ID %s" % eid)
+
+                sql_exps = 'UPDATE experiments SET status="pending", run_finished=NULL, data_file_size=NULL, ' \
+                           'data_file_sha256=NULL WHERE id=%s'
+                try_execute(lambda: c.execute(sql_exps, (eid,)), msg="Experiment reset for ID %s" % eid)
+
+                sql_exps = 'UPDATE jobs SET status="pending", run_finished=NULL, run_heartbeat=NULL, ' \
+                           'retries=0 WHERE experiment_id=%s'
+                try_execute(lambda: c.execute(sql_exps, (eid,)), msg="Jobs reset for ID %s" % eid)
+
+                self.conn.commit()
+
     def fix_tangle(self):
         """Tangle experiments were mislabeled, just fix the name"""
         with self.conn.cursor() as c:
