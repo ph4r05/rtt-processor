@@ -587,11 +587,12 @@ class Cleaner:
                 e2id, e2name = result[9:11]
                 b2id, b2total, b2pass, b2pval = result[11:15]
                 orig_ename = re.sub(r'-boolex-.*$', '', ename)
+                e2name_cln = re.sub(r'\.json$', '', e2name)
 
                 if b2id is None or e2id is None or bid is None or eid is None:
                     continue
 
-                if orig_ename != e2name:
+                if orig_ename != e2name_cln:
                     logger.warning(f'Suspicious boolex record eid:jid:bid {eid}:{jid}:{bid} '
                                    f'connecting to eid2:bid2 {e2id}:{b2id}, '
                                    f'ename {ename} vs {e2name}')
