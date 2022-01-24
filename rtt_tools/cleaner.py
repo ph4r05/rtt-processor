@@ -588,7 +588,7 @@ class Cleaner:
                 b2id, b2total, b2pass, b2pval = result[11:15]
                 orig_ename = re.sub(r'-boolex-.*$', '', ename)
 
-                if b2id is None or e2id is None:
+                if b2id is None or e2id is None or bid is None or eid is None:
                     continue
 
                 if orig_ename != e2name:
