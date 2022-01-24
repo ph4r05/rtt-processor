@@ -24,7 +24,7 @@ from rtt_tools.generator_mpc import get_input_key, get_input_size, comp_hw_weigh
     comb_cached, rank, HwSpaceTooSmall, generate_cfg_col, StreamOptions, ExpRec, write_submit_obj, generate_cfg_inp, \
     gen_lowmc_core, gen_script_config, MPC_SAGE_PARAMS
 from rtt_tools.gen.max_rounds import FUNC_DB, FuncDb, FuncInfo
-from rtt_tools.utils import natural_sort_key
+from rtt_tools.utils import natural_sort_key, merge_pvals
 
 logger = logging.getLogger(__name__)
 coloredlogs.CHROOT_FILES = []
@@ -561,6 +561,78 @@ class Cleaner:
                 try_execute(lambda: c.execute(sql_exps, (eid,)), msg="Jobs reset for ID %s" % eid)
 
                 self.conn.commit()
+
+    def fix_boolex(self, from_id=None, dry_run=False):
+        """Merge boolex results to appropriate testing battery"""
+        with self.conn.cursor() as c:
+            logger.info("Processing experiments")
+
+            c.execute("""SELECT j.id, j.battery AS jbat, e.id AS eid, e.name AS ename, b.id AS bid, b.name AS bname, 
+                            b.total_tests, b.passed_tests, b.pvalue,
+                            e2.id AS e2id, e2.name AS e2name, b2.id as b2id,
+                            b2.total_tests, b2.passed_tests, b2.pvalue
+                            FROM jobs j
+                            JOIN experiments e on e.id = j.experiment_id
+                            JOIN rtt_data_providers dp ON e.data_file_id = dp.id
+                            JOIN rtt_config_files dc ON e.config_file_id = dc.id
+                            LEFT JOIN batteries b ON b.job_id = j.id
+                            LEFT JOIN experiments e2 ON e2.data_file_id = e.data_file_id AND e2.id != e.id
+                            LEFT JOIN batteries b2 ON b2.experiment_id = e2.id AND b2.name = b.name AND b2.id != b.id 
+                            WHERE e.id >= %s AND e.status = 'finished' AND e.name LIKE '%%-boolex-%%' 
+                            ORDER BY j.id DESC
+                              """ % (from_id or self.exp_id_low,))
+
+            for result in c.fetchall():
+                jid, jbat, eid, ename, bid, bname, btotal, bpass, bpval = result[0:9]
+                e2id, e2name = result[9:11]
+                b2id, b2total, b2pass, b2pval = result[11:15]
+                orig_ename = re.sub(r'-boolex-.*$', '', ename)
+
+                if b2id is None or e2id is None:
+                    continue
+
+                if orig_ename != e2name:
+                    logger.warning(f'Suspicious boolex record eid:jid:bid {eid}:{jid}:{bid} '
+                                   f'connecting to eid2:bid2 {e2id}:{b2id}, '
+                                   f'ename {ename} vs {e2name}')
+                    continue
+
+                npval = merge_pvals([bpval, b2pval])[0]
+                ntotal = btotal + b2total
+                npass = bpass + b2pass
+
+                logger.info(f'eid:jid:bid {eid}:{jid}:{bid} connecting to eid2:bid2 {e2id}:{b2id}, '
+                            f'ename {ename} vs {e2name}, '
+                            f'total:pass:pval {bpval}:{btotal}:{bpass}, new '
+                            f'total:pass:pval {b2pval}:{b2total}:{b2pass} result '
+                            f'total:pass:pval {npval}:{ntotal}:{npass} '
+                            )
+                if dry_run:
+                    continue
+
+                print(f'Changing battery result to old experiment {bid} -> {b2id} (old)')
+                csql = 'UPDATE tests SET battery_id=%s where battery_id=%s'
+                try_execute(lambda: c.execute(csql, (b2id, bid,)),
+                            msg="Changing battery result to old experiment")
+
+                print(f'Update summary stats for {b2id} (old)')
+                csql = 'UPDATE batteries SET total_tests=%s, passed_tests=%s, pvalue=%s where id=%s'
+                try_execute(lambda: c.execute(csql, (ntotal, npass, npval, b2id,)),
+                            msg="Update summary stats")
+
+                print(f'Delete old battery info')
+                csql = 'DELETE FROM batteries WHERE id=%s'
+                try_execute(lambda: c.execute(csql, (bid,)),
+                            msg="'Delete old battery info")
+                self.conn.commit()
+
+                print(f'Delete old experiment info')
+                csql = 'DELETE FROM experiments WHERE id=%s'
+                try_execute(lambda: c.execute(csql, (eid,)),
+                            msg="Delete old experiment info")
+                self.conn.commit()
+
+            logger.info(f'Done')
 
     def fix_tangle(self):
         """Tangle experiments were mislabeled, just fix the name"""
