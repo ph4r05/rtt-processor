@@ -562,6 +562,43 @@ class Cleaner:
 
                 self.conn.commit()
 
+    def fix_broken_batteries(self, from_id=None, dry_run=False):
+        """Removes all battery results that ended with DB errors, reschedules jobs and experiments to run"""
+        with self.conn.cursor() as c:
+            logger.info("Processing experiments")
+
+            c.execute("""SELECT be.message, b.id AS bid, j.id AS jid, e.id AS eid, b.total_tests, b.name, e.name
+                             FROM battery_errors be 
+                             JOIN batteries b ON b.id = be.battery_id
+                             JOIN jobs j ON b.job_id = j.id
+                             JOIN experiments e ON e.id = b.experiment_id
+                             WHERE e.id >= %s AND b.total_tests = 0 
+                                AND be.message NOT LIKE '%%no tests were%%' 
+                                AND (be.message LIKE 'Lock wait timeout%%' OR be.message LIKE 'Deadlock found%%' OR be.message LIKE '%%empty statistics%%')
+                                AND e.name NOT LIKE '%%-Vision%%' 
+                             ORDER BY b.id DESC     
+                              """ % (from_id or self.exp_id_low,))
+
+            for result in c.fetchall():
+                msg, bid, jid, eid, totals, bname, ename = \
+                    result[0], int(result[1]), int(result[2]), int(result[3]), int(result[4]), result[5], result[6]
+
+                logger.info(f'Zero tests for battery, {eid} {ename} : {bname}, {msg}')
+                if dry_run:
+                    continue
+
+                sql_exps = 'DELETE FROM batteries WHERE id=%s'
+                try_execute(lambda: c.execute(sql_exps, (bid,)), msg="Delete battery results for ID %s" % bid)
+
+                sql_exps = 'UPDATE experiments SET status="running" WHERE id=%s'
+                try_execute(lambda: c.execute(sql_exps, (eid,)), msg="Experiment reset for ID %s" % eid)
+
+                sql_exps = 'UPDATE jobs SET status="pending", run_finished=NULL, run_heartbeat=NULL, ' \
+                           'retries=0 WHERE id=%s'
+                try_execute(lambda: c.execute(sql_exps, (jid,)), msg="Jobs reset for ID %s" % jid)
+
+                self.conn.commit()
+
     def fix_boolex(self, from_id=None, dry_run=False):
         """Merge boolex results to appropriate testing battery"""
         with self.conn.cursor() as c:
