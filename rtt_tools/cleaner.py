@@ -675,7 +675,8 @@ class Cleaner:
                          JOIN batteries b ON b.experiment_id = e.id
                          JOIN jobs j ON b.job_id = j.id
                          WHERE e.id > %s 
-                          AND b.total_tests < 36 and b.name LIKE 'booltest%%' AND e.name LIKE 'PH%%' AND j.retries < 10
+                          AND b.total_tests < 36 and b.name LIKE 'booltest%%' AND j.retries < 10
+                          AND (e.name LIKE 'PH%%' OR e.name LIKE 'testmpc%%') AND e.name NOT LIKE '%%Vision%%'
                          ORDER BY e.id DESC
                          LIMIT 1000
                         """ % (from_id or self.exp_id_low,))
@@ -691,6 +692,44 @@ class Cleaner:
                     continue
 
                 self._remove_bat(c, eid=eid, jid=jid, bid=bid)
+                self.conn.commit()
+
+    def fix_dup_results(self, from_id=None, dry_run=False):
+        """Removes duplicate battery results"""
+        with self.conn.cursor() as c:
+            logger.info("Processing experiments")
+            c.execute("""SELECT 
+                        e.id AS eid, e.name AS ename
+                        , b.id as bid, b.name as bname, b.total_tests, b.passed_tests
+                        , b2.id as b2id, b2.total_tests, b2.passed_tests
+                            FROM experiments e
+                            LEFT JOIN batteries b ON b.experiment_id = e.id
+                            LEFT JOIN batteries b2 ON b2.experiment_id = e.id AND b.id < b2.id AND b.name = b2.name
+                            WHERE b.id is not null and b2.id is not null
+                              AND e.id > %s AND (e.name LIKE 'PH%%' or e.name LIKE 'testmpc%%')
+                            ORDER BY e.id DESC 
+                        """ % (from_id or self.exp_id_low,))
+
+            for result in c.fetchall():
+                eid, ename, bid, bname, btotal, bpass, b2id, b2total, b2pass = \
+                    int(result[0]), result[1], int(result[2]), result[3], int(result[4]), int(result[5]), \
+                    int(result[6]), int(result[7]), int(result[8])
+
+                logger.info(f'Duplicate results for {eid}: {ename}, {bid} {bname}, {bpass}/{btotal} vs {b2id} {b2pass}/{b2total}')
+                if btotal != b2total:
+                    logger.warning(f'Total num of tests mismatch')
+                    continue
+
+                if bpass != b2pass:
+                    logger.warning(f'Passed num of tests mismatch')
+                    continue
+
+                logger.info(f'Removing {b2id}')
+                if dry_run:
+                    continue
+
+                sql_exps = 'DELETE FROM batteries WHERE id=%s'
+                try_execute(lambda: c.execute(sql_exps, (b2id,)), msg="Delete battery results for ID %s" % b2id)
                 self.conn.commit()
 
     def _remove_bat(self, c, bid, jid, eid):
