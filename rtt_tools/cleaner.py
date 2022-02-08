@@ -599,6 +599,46 @@ class Cleaner:
 
                 self.conn.commit()
 
+    def fix_dup_ref(self, from_id=None, dry_run=False):
+        """Removes duplicate reference runs"""
+        with self.conn.cursor() as c:
+            logger.info("Processing experiments")
+
+            c.execute("""SELECT e.id AS eid, e.name, e.data_file_sha256
+                             FROM experiments e
+                             WHERE e.id >= %s  
+                                AND e.name LIKE 'PH-SMREF%%' 
+                             ORDER BY e.name DESC, e.id ASC
+                              """ % (from_id or self.exp_id_low,))
+
+            data = []
+            for result in c.fetchall():
+                eid, ename, ehash = \
+                    int(result[0]), result[1], result[2]
+                data.append((eid, ename, ehash))
+
+            for k, g in itertools.groupby(data, lambda x: x[1]):
+                g = list(g)
+                if len(g) <= 1:
+                    continue
+
+                eid, ename, ehash = g[0]
+                hashes = set([x[2] for x in g])
+                logger.info(f'Duplicate ref, {eid} {ename} {ehash}, len: {len(g)}, hashes: {len(hashes)}')
+                if len(hashes) != 1:
+                    continue
+
+                if dry_run:
+                    continue
+
+                for dels in g[1:]:
+                    ceid = dels[0]
+                    logger.info(f'Deleting experiment {ceid}, {dels}')
+                    sql_exps = 'DELETE FROM experiments WHERE id=%s'
+                    try_execute(lambda: c.execute(sql_exps, (ceid,)), msg="Delete experiments results for ID %s" % ceid)
+
+                self.conn.commit()
+
     def fix_boolex(self, from_id=None, dry_run=False):
         """Merge boolex results to appropriate testing battery"""
         with self.conn.cursor() as c:
