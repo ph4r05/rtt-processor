@@ -32,6 +32,42 @@ coloredlogs.install(level=logging.DEBUG, use_chroot=False)
 EMPTY_SHA = b'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
 EMPTY_SHA_STR = EMPTY_SHA.decode('utf8')
 
+"""
+Useful queries:
+
+# --------------------------------------------------------------------------------------------------------------------------------------------
+# Check Booltest2 result, has to contain data SHA256 in the variant result (data file was correct when booltest2 was computed)
+
+SELECT b.id AS bid, j.id AS jid, e.id AS eid, b.total_tests, b.passed_tests, b.name, e.name, j.run_started, data_file_sha256, vs.message
+ FROM experiments e
+ JOIN batteries b ON b.experiment_id = e.id
+ JOIN jobs j ON b.job_id = j.id
+ LEFT JOIN tests t ON t.battery_id = b.id
+ LEFT JOIN variants v ON v.test_id = t.id
+ LEFT JOIN variant_results vs ON vs.variant_id = v.id
+ WHERE e.id > 284000 
+  AND DATE(j.run_started) IN ('2022-01-15', '2022-01-16', '2022-01-17')
+  AND b.name LIKE 'booltest_2%'
+  AND t.name = 'halving 128-1-1'
+  AND (e.data_file_sha256 is NULL OR INSTR(vs.message, e.data_file_sha256) = 0)
+ ORDER BY e.id DESC
+ LIMIT 1000
+ 
+# --------------------------------------------------------------------------------------------------------------------------------------------
+# Load results that have some batteries rejecting differently than others (disbalance)
+ 
+SELECT b.id AS bid, j.id AS jid, e.id AS eid, b.total_tests, b.passed_tests, b.name, e.name, b2.id AS b2id, j.run_started, b2.name, b2.total_tests, b2.passed_tests 
+ FROM experiments e
+ JOIN batteries b ON b.experiment_id = e.id
+ JOIN batteries b2 ON b2.experiment_id = e.id AND b.id != b2.id
+ JOIN jobs j ON b.job_id = j.id
+ WHERE e.id > 284000 
+  AND b.name LIKE 'testu01%' AND b2.name LIKE 'testu01%'
+  AND b.total_tests > 0 AND b2.total_tests > 0 
+  AND (b.passed_tests / b.total_tests) < 0.5 and (b2.passed_tests / b2.total_tests) > 0.6
+  #AND DATE(j.run_started) = '2022-01-16'
+ ORDER BY e.id DESC LIMIT 5000
+"""
 
 def try_execute(fnc, attempts=40, msg=""):
     for att in range(attempts):
@@ -549,17 +585,7 @@ class Cleaner:
                 if dry_run:
                     continue
 
-                sql_exps = 'DELETE FROM batteries WHERE experiment_id=%s'
-                try_execute(lambda: c.execute(sql_exps, (eid,)), msg="Delete battery results for ID %s" % eid)
-
-                sql_exps = 'UPDATE experiments SET status="pending", run_finished=NULL, data_file_size=NULL, ' \
-                           'data_file_sha256=NULL WHERE id=%s'
-                try_execute(lambda: c.execute(sql_exps, (eid,)), msg="Experiment reset for ID %s" % eid)
-
-                sql_exps = 'UPDATE jobs SET status="pending", run_finished=NULL, run_heartbeat=NULL, ' \
-                           'retries=0 WHERE experiment_id=%s'
-                try_execute(lambda: c.execute(sql_exps, (eid,)), msg="Jobs reset for ID %s" % eid)
-
+                self._recompute_eid(c, eid=eid)
                 self.conn.commit()
 
     def fix_broken_batteries(self, from_id=None, dry_run=False):
@@ -587,16 +613,7 @@ class Cleaner:
                 if dry_run:
                     continue
 
-                sql_exps = 'DELETE FROM batteries WHERE id=%s'
-                try_execute(lambda: c.execute(sql_exps, (bid,)), msg="Delete battery results for ID %s" % bid)
-
-                sql_exps = 'UPDATE experiments SET status="running" WHERE id=%s'
-                try_execute(lambda: c.execute(sql_exps, (eid,)), msg="Experiment reset for ID %s" % eid)
-
-                sql_exps = 'UPDATE jobs SET status="pending", run_finished=NULL, run_heartbeat=NULL, ' \
-                           'retries=0 WHERE id=%s'
-                try_execute(lambda: c.execute(sql_exps, (jid,)), msg="Jobs reset for ID %s" % jid)
-
+                self._remove_bat(c, bid=bid, jid=jid, eid=eid)
                 self.conn.commit()
 
     def fix_dup_ref(self, from_id=None, dry_run=False):
@@ -638,6 +655,65 @@ class Cleaner:
                     try_execute(lambda: c.execute(sql_exps, (ceid,)), msg="Delete experiments results for ID %s" % ceid)
 
                 self.conn.commit()
+
+    def recomp_experiments(self, experiments):
+        """Delete all computation results and set jobs to recompute"""
+        with self.conn.cursor() as c:
+            logger.info("Processing experiments")
+            for eid in experiments:
+                logger.info(f'Deleting results for {eid}')
+
+                self._recompute_eid(c, eid=eid)
+                self.conn.commit()
+
+    def fix_incomple_booltests(self, from_id=None, dry_run=False):
+        """Recompute booltests with incomplete result sets"""
+        with self.conn.cursor() as c:
+            logger.info("Processing experiments")
+            c.execute("""SELECT b.id AS bid, j.id AS jid, e.id AS eid, b.total_tests, b.name, e.name, j.run_started, data_file_sha256
+                         FROM experiments e
+                         JOIN batteries b ON b.experiment_id = e.id
+                         JOIN jobs j ON b.job_id = j.id
+                         WHERE e.id > %s 
+                          AND b.total_tests < 36 and b.name LIKE 'booltest%%' AND e.name LIKE 'PH%%' AND j.retries < 10
+                         ORDER BY e.id DESC
+                         LIMIT 1000
+                        """ % (from_id or self.exp_id_low,))
+
+            for result in c.fetchall():
+                bid, jid, eid, total, bname, ename, jstarted, ehash = \
+                    int(result[0]), int(result[1]), int(result[2]), int(result[3]), result[4], result[5], result[6], \
+                    result[7]
+
+                logger.info(f'Deleting results for {eid}, bid {bid}, jid {jid}, {ename} - {bname} total {total}, {jstarted}, {ehash}')
+
+                if dry_run:
+                    continue
+
+                self._remove_bat(c, eid=eid, jid=jid, bid=bid)
+                self.conn.commit()
+
+    def _remove_bat(self, c, bid, jid, eid):
+        sql_exps = 'DELETE FROM batteries WHERE id=%s'
+        try_execute(lambda: c.execute(sql_exps, (bid,)), msg="Delete battery results for ID %s" % bid)
+
+        sql_exps = 'UPDATE experiments SET status="running" WHERE id=%s'
+        try_execute(lambda: c.execute(sql_exps, (eid,)), msg="Experiment reset for ID %s" % eid)
+
+        sql_exps = 'UPDATE jobs SET status="pending", run_finished=NULL, run_heartbeat=NULL, ' \
+                   'retries=0 WHERE id=%s'
+        try_execute(lambda: c.execute(sql_exps, (jid,)), msg="Jobs reset for ID %s" % jid)
+
+    def _recompute_eid(self, c, eid):
+        sql_exps = 'DELETE FROM batteries WHERE experiment_id=%s'
+        try_execute(lambda: c.execute(sql_exps, (eid,)), msg="Delete battery results for ID %s" % eid)
+
+        sql_exps = 'UPDATE experiments SET status="pending", data_file_sha256=NULL, data_file_size=NULL WHERE id=%s'
+        try_execute(lambda: c.execute(sql_exps, (eid,)), msg="Experiment reset for ID %s" % eid)
+
+        sql_exps = 'UPDATE jobs SET status="pending", run_finished=NULL, run_heartbeat=NULL, ' \
+                   'retries=0 WHERE experiment_id=%s'
+        try_execute(lambda: c.execute(sql_exps, (eid,)), msg="Jobs reset for ID %s" % eid)
 
     def fix_boolex(self, from_id=None, dry_run=False):
         """Merge boolex results to appropriate testing battery"""
