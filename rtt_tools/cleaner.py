@@ -616,6 +616,34 @@ class Cleaner:
                 self._remove_bat(c, bid=bid, jid=jid, eid=eid)
                 self.conn.commit()
 
+    def rerun_empty_batteries(self, from_id=None, dry_run=False):
+        """Fixes Booltest|Dieharder|NIST runs with 0 total tests"""
+        with self.conn.cursor() as c:
+            logger.info("Processing experiments")
+
+            c.execute("""SELECT j.id, j.battery, e.id, e.name, b.id, b.name, b.total_tests
+                            FROM jobs j
+                            JOIN experiments e on e.id = j.experiment_id
+                            LEFT JOIN batteries b ON b.job_id = j.id
+                            WHERE e.id >= %s 
+                            AND j.status = 'finished' 
+                            AND (j.battery LIKE 'booltest%%' OR j.battery LIKE 'Dieharder%%' OR j.battery LIKE 'NIST%%') 
+                            AND (b.total_tests is NULL OR b.total_tests = 0)
+                            ORDER BY e.id
+                              """ % (from_id or self.exp_id_low,))
+
+            for result in c.fetchall():
+                jid, jbat, eid, ename, bid, bname, btotal = result[0:7]
+
+                logger.info(f'Zero tests for battery, {eid} {ename} : {bname}')
+                if dry_run:
+                    continue
+
+                self._remove_bat(c, bid=bid, jid=jid, eid=eid)
+                self.conn.commit()
+
+        self.conn.commit()
+
     def fix_dup_ref(self, from_id=None, dry_run=False):
         """Removes duplicate reference runs"""
         with self.conn.cursor() as c:
