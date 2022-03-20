@@ -24,8 +24,8 @@ class FuncInfo:
     NONE = 0
     BLOCK = 1
     STREAM = 2
-    LIGHT = 3
     MPC = 4
+    LIGHT = 8
 
     def __init__(self, fname, ftype, stype=None, max_rounds=None, human_broken_rounds=None, partial_rounds=None,
                  block_size=None, key_size=None, iv_size=None, year=None, ctype=None):
@@ -102,7 +102,7 @@ def get_alg_type(ftype, stype):
         return 'prng'
     elif stype == FuncInfo.STREAM:
         return 'stream_cipher'
-    elif ftype == FuncInfo.CIPHER and stype in [FuncInfo.BLOCK, FuncInfo.NONE, None]:
+    elif ftype == FuncInfo.CIPHER and stype in [FuncInfo.BLOCK, FuncInfo.LIGHT, FuncInfo.NONE, None]:
         return 'block'
     else:
         raise ValueError(f'Unknown algtype for {ftype}:{stype}')
