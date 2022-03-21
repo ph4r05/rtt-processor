@@ -109,6 +109,10 @@ def get_alg_type(ftype, stype):
         raise ValueError(f'Unknown algtype for {ftype}:{stype}')
 
 
+"""
+Finding Integral Distinguishers with Ease https://eprint.iacr.org/2018/688.pdf
+ - LED, Present, chacha, chaskey, lea, hight, salsa, speck, sparx, des, lblock, misty, roadrunner, simon, twine, prince, rectangle
+"""
 FUNC_DB = FuncDb()
 FUNC_DB.add_all([
     FuncInfo('ABC', FuncInfo.HASH, None, 9, None),  # v3, https://eprint.iacr.org/2010/658.pdf
@@ -124,32 +128,32 @@ FUNC_DB.add_all([
     FuncInfo('Cast', FuncInfo.CIPHER, None, 12, 9, block_size=8, key_size=16, iv_size=16, year=1996, ctype=FConstType.FN),  # https://en.wikipedia.org/wiki/CAST-128
     FuncInfo('Chaskey', FuncInfo.CIPHER, FuncInfo.LIGHT, 16, 7, block_size=16, key_size=16, iv_size=16, year=2014, ctype=FConstType.ARX),  # https://mouha.be/chaskey/
     FuncInfo('Fantomas', FuncInfo.CIPHER, None, 12, 5, block_size=16, key_size=16, iv_size=16, year=2014, ctype=FConstType.SPN),  # https://www.mdpi.com/2410-387X/3/1/4/htm https://who.paris.inria.fr/Gaetan.Leurent/files/LS_FSE14.pdf
-    FuncInfo('Gost', FuncInfo.CIPHER, None, 32, None, block_size=8, key_size=32, iv_size=16, year=1994, ctype=FConstType.FN),  # https://cryptography.fandom.com/wiki/GOST_(block_cipher)
-    FuncInfo('Hight', FuncInfo.CIPHER, FuncInfo.LIGHT, 32, None, block_size=8, key_size=16, iv_size=16, year=2006, ctype=FConstType.FN),  # https://link.springer.com/chapter/10.1007/11894063_4
+    FuncInfo('Gost', FuncInfo.CIPHER, None, 32, 20, block_size=8, key_size=32, iv_size=16, year=1994, ctype=FConstType.FN),  # https://cryptography.fandom.com/wiki/GOST_(block_cipher), att: https://eprint.iacr.org/2011/312.pdf https://eprint.iacr.org/2017/487.pdf
+    FuncInfo('Hight', FuncInfo.CIPHER, FuncInfo.LIGHT, 32, 18, block_size=8, key_size=16, iv_size=16, year=2006, ctype=FConstType.FN),  # https://link.springer.com/chapter/10.1007/11894063_4 https://ieeexplore.ieee.org/document/8109901./ https://www.researchgate.net/profile/Bing-Sun-14/publication/221282558_Saturation_Attack_on_the_Block_Cipher_HIGHT/ https://eprint.iacr.org/2018/688.pdf
     FuncInfo('Idea', FuncInfo.CIPHER, None, 8, 4, block_size=8, key_size=16, iv_size=16, year=1991, ctype=FConstType.LMS),  # https://en.wikipedia.org/wiki/International_Data_Encryption_Algorithm
     FuncInfo('Kasumi', FuncInfo.CIPHER, None, 8, 8, block_size=8, key_size=16, iv_size=16, year=2005, ctype=FConstType.FN),
     FuncInfo('KUZNYECHIK', FuncInfo.CIPHER, None, 10, 4, block_size=16, key_size=32, iv_size=16, year=2015, ctype=FConstType.SPN),  # https://en.wikipedia.org/wiki/Kuznyechik
     FuncInfo('LBLOCK', FuncInfo.CIPHER, None, 32, 24, block_size=8, key_size=10, iv_size=16, year=2011, ctype=FConstType.FN),
-    FuncInfo('LEA', FuncInfo.CIPHER, None, 24, None, block_size=16, key_size=16, iv_size=16, year=2013, ctype=FConstType.ARX),
+    FuncInfo('LEA', FuncInfo.CIPHER, None, 24, 8, block_size=16, key_size=16, iv_size=16, year=2013, ctype=FConstType.ARX),  # https://ieeexplore.ieee.org/document/8109901./keywords#keywords https://eprint.iacr.org/2018/688.pdf
     FuncInfo('LED', FuncInfo.CIPHER, None, 48, None, block_size=8, key_size=10, iv_size=16, year=2010, ctype=FConstType.SPN),
-    FuncInfo('MARS', FuncInfo.CIPHER, None, 16, None, block_size=16, key_size=16, iv_size=16, year=1999, ctype=FConstType.FN),
+    FuncInfo('MARS', FuncInfo.CIPHER, None, 16, 8, block_size=16, key_size=16, iv_size=16, year=1999, ctype=FConstType.FN),  # https://eprint.iacr.org/2006/217.pdf
     FuncInfo('MISTY1', FuncInfo.CIPHER, None, 8, 6, block_size=8, key_size=16, iv_size=16, year=1995, ctype=FConstType.FN),
     FuncInfo('NOEKEON', FuncInfo.CIPHER, None, 16, 4, block_size=16, key_size=16, iv_size=16, year=2009, ctype=FConstType.SPN),  # https://en.wikipedia.org/wiki/NOEKEON
-    FuncInfo('PICCOLO', FuncInfo.CIPHER, None, 25, None, block_size=8, key_size=10, iv_size=16, year=2011, ctype=FConstType.FN),
+    FuncInfo('PICCOLO', FuncInfo.CIPHER, None, 25, 5, block_size=8, key_size=10, iv_size=16, year=2011, ctype=FConstType.FN),  # https://www.koreascience.or.kr/article/JAKO201932365651180.page
     FuncInfo('PRIDE', FuncInfo.CIPHER, None, 20, 19, block_size=8, key_size=16, iv_size=16, year=2014, ctype=FConstType.SPN),  # https://eprint.iacr.org/2014/656.pdf
     FuncInfo('Prince', FuncInfo.CIPHER, None, 12, 6, block_size=8, key_size=16, iv_size=16, year=2012, ctype=FConstType.SPN),  # https://en.wikipedia.org/wiki/Prince_(cipher)
-    FuncInfo('RC5-20', FuncInfo.CIPHER, None, 20, None, block_size=8, key_size=16, iv_size=16, year=1997, ctype=FConstType.FN),
-    FuncInfo('RC6', FuncInfo.CIPHER, None, 20, None, block_size=16, key_size=16, iv_size=16, year=1997, ctype=FConstType.GFN),
+    FuncInfo('RC5-20', FuncInfo.CIPHER, None, 20, 17, block_size=8, key_size=16, iv_size=16, year=1997, ctype=FConstType.FN),  # https://media.hotnews.ro/media_server1/document-2012-05-9-12207779-0-articolul-semnat-ioan-mang.pdf
+    FuncInfo('RC6', FuncInfo.CIPHER, None, 20, 5, block_size=16, key_size=16, iv_size=16, year=1997, ctype=FConstType.GFN),  # https://www.cryptrec.go.jp/exreport/cryptrec-ex-1086-2000.pdf  https://media.hotnews.ro/media_server1/document-2012-05-9-12207779-0-articolul-semnat-ioan-mang.pdf
     FuncInfo('RECTANGLE-K128', FuncInfo.CIPHER, FuncInfo.LIGHT, 25, 14, block_size=8, key_size=16, iv_size=16, year=2014, ctype=FConstType.SPN),  # https://eprint.iacr.org/2014/084.pdf
     FuncInfo('RECTANGLE-K80', FuncInfo.CIPHER, FuncInfo.LIGHT, 25, 18, block_size=8, key_size=10, iv_size=16, year=2014, ctype=FConstType.SPN),
-    FuncInfo('ROAD-RUNNER-K128', FuncInfo.CIPHER, FuncInfo.LIGHT, 12, None, block_size=8, key_size=16, iv_size=16, year=2015, ctype=FConstType.FN),  # https://eprint.iacr.org/2015/906.pdf
-    FuncInfo('ROAD-RUNNER-K80', FuncInfo.CIPHER, FuncInfo.LIGHT, 10, None, block_size=8, key_size=10, iv_size=16, year=2015, ctype=FConstType.FN),
+    FuncInfo('ROAD-RUNNER-K128', FuncInfo.CIPHER, FuncInfo.LIGHT, 12, 8, block_size=8, key_size=16, iv_size=16, year=2015, ctype=FConstType.FN),  # https://eprint.iacr.org/2015/906.pdf  https://eprint.iacr.org/2018/688.pdf
+    FuncInfo('ROAD-RUNNER-K80', FuncInfo.CIPHER, FuncInfo.LIGHT, 10, 8, block_size=8, key_size=10, iv_size=16, year=2015, ctype=FConstType.FN),  # https://eprint.iacr.org/2018/688.pdf
     FuncInfo('ROBIN', FuncInfo.CIPHER, None, 16, 16, block_size=16, key_size=16, iv_size=16, year=2014, ctype=FConstType.SPN),  # https://who.paris.inria.fr/Gaetan.Leurent/files/LS_FSE14.pdf
     FuncInfo('ROBIN-STAR', FuncInfo.CIPHER, None, 16, None, block_size=16, key_size=16, iv_size=16, year=2017, ctype=FConstType.SPN),  # https://fenix.tecnico.ulisboa.pt/downloadFile/281870113704550/Extended_Abstract-Choosing_the_Future_of_Lightweight_Encryption_Algorithms.pdf
     FuncInfo('SEED', FuncInfo.CIPHER, None, 16, None, block_size=16, key_size=16, iv_size=16, year=1998, ctype=FConstType.FN),  # https://en.wikipedia.org/wiki/SEED
     FuncInfo('SERPENT', FuncInfo.CIPHER, None, 32, 5, block_size=16, key_size=16, iv_size=16, year=1998, ctype=FConstType.SPN),  # https://en.wikipedia.org/wiki/Serpent_(cipher)
     FuncInfo('SHACAL2', FuncInfo.CIPHER, None, 80, 44, block_size=32, key_size=64, iv_size=16, year=2000, ctype=FConstType.HASH),  # https://www.researchgate.net/publication/220237385_Attacking_44_Rounds_of_the_SHACAL-2_Block_Cipher_Using_Related-Key_Rectangle_Cryptanalysis https://github.com/odzhan/tinycrypt/blob/master/block/shacal2/doc/10.1.1.3.4066.pdf
-    FuncInfo('SIMON', FuncInfo.CIPHER, None, 68, 17, block_size=16, key_size=16, iv_size=16, year=2013, ctype=FConstType.SPN),
+    FuncInfo('SIMON', FuncInfo.CIPHER, None, 68, 26, block_size=16, key_size=16, iv_size=16, year=2013, ctype=FConstType.SPN),  # https://eprint.iacr.org/2018/688.pdf
     FuncInfo('SINGLE-DES', FuncInfo.CIPHER, None, 16, 16, block_size=8, key_size=7, iv_size=16, year=1977, ctype=FConstType.FN),  # https://en.wikipedia.org/wiki/Data_Encryption_Standard
     FuncInfo('SPARX-B128', FuncInfo.CIPHER, FuncInfo.LIGHT, 32, 8, block_size=16, key_size=16, iv_size=16, year=2016, ctype=FConstType.ARX),  # https://www.cryptolux.org/index.php/SPARX
     FuncInfo('SPARX-B64', FuncInfo.CIPHER, FuncInfo.LIGHT, 24, 8, block_size=8, key_size=16, iv_size=16, year=2016, ctype=FConstType.ARX),
@@ -162,11 +166,11 @@ FUNC_DB.add_all([
 
     FuncInfo('ARIRANG', FuncInfo.HASH, None, 4, 4, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/ARIRANG
     FuncInfo('AURORA', FuncInfo.HASH, None, 17, None, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/AURORA
-    FuncInfo('Abacus', FuncInfo.HASH, None, 280, None, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/Abacus
+    FuncInfo('Abacus', FuncInfo.HASH, None, 280, None, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/Abacus  broken: https://scholarworks.rit.edu/cgi/viewcontent.cgi?referer=&httpsredir=1&article=1653&context=theses
     FuncInfo('BLAKE', FuncInfo.HASH, None, 14, 4, block_size=32, year=2008, ctype=FConstType.ARX),  # https://ehash.iaik.tugraz.at/wiki/BLAKE
-    FuncInfo('BMW', FuncInfo.HASH, None, 16, None, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/Blue_Midnight_Wish
+    FuncInfo('BMW', FuncInfo.HASH, None, 16, None, block_size=32, year=2008, ctype=FConstType.ARX),  # https://ehash.iaik.tugraz.at/wiki/Blue_Midnight_Wish  https://link.springer.com/content/pdf/10.1007%2F978-3-642-13858-4_17.pdf
     FuncInfo('Blender', FuncInfo.HASH, None, 32, None, block_size=64, year=2008),  # https://ehash.iaik.tugraz.at/wiki/Blender
-    FuncInfo('Boole', FuncInfo.HASH, None, 16, 16, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/Boole
+    FuncInfo('Boole', FuncInfo.HASH, None, 16, 16, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/Boole  https://ehash.iaik.tugraz.at/uploads/3/37/BoolePaper.pdf
     FuncInfo('CHI', FuncInfo.HASH, None, 20, None, block_size=64, year=2008),  # https://ehash.iaik.tugraz.at/wiki/CHI
     FuncInfo('Cheetah', FuncInfo.HASH, None, 16, 12, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/Cheetah
     FuncInfo('CubeHash', FuncInfo.HASH, None, 8, None, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/CubeHash
@@ -174,18 +178,18 @@ FUNC_DB.add_all([
     FuncInfo('DynamicSHA', FuncInfo.HASH, None, 16, None, block_size=48, hash_size=64, year=2008),  # https://ehash.iaik.tugraz.at/wiki/Dynamic_SHA
     FuncInfo('DynamicSHA2', FuncInfo.HASH, None, 17, 17, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/Dynamic_SHA2
     FuncInfo('ECHO', FuncInfo.HASH, None, 8, 4, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/ECHO
-    FuncInfo('ESSENCE', FuncInfo.HASH, None, 32, None, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/ESSENCE
+    FuncInfo('ESSENCE', FuncInfo.HASH, None, 32, 14, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/ESSENCE https://tsapps.nist.gov/publication/get_pdf.cfm?pub_id=904375 "Cryptanalysis of the ESSENCE Family of Hash Functions"
     FuncInfo('Gost', FuncInfo.HASH, None, 32, 5, block_size=32, year=1994),  # https://en.wikipedia.org/wiki/GOST_(hash_function)
-    FuncInfo('Grostl', FuncInfo.HASH, None, 10, None, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/Groestl
+    FuncInfo('Grostl', FuncInfo.HASH, None, 10, None, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/Groestl https://tosc.iacr.org/index.php/ToSC/article/view/763/721
     FuncInfo('Hamsi', FuncInfo.HASH, None, 3, None, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/Hamsi
     FuncInfo('JH', FuncInfo.HASH, None, 42, 10, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/JH
     FuncInfo('Keccak', FuncInfo.HASH, None, 24, 5, block_size=32, year=2008, ctype=FConstType.SPONGE),  # https://ehash.iaik.tugraz.at/wiki/Keccak
     FuncInfo('Lesamnta', FuncInfo.HASH, None, 32, 32, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/Lesamnta
     FuncInfo('Luffa', FuncInfo.HASH, None, 8, 8, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/Luffa
     FuncInfo('MCSSHA3', FuncInfo.HASH, None, 1, None, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/MCSSHA-3
-    FuncInfo('MD5', FuncInfo.HASH, None, 64, 64, block_size=16, year=1992, ctype=FConstType.MERKLED),  # https://ehash.iaik.tugraz.at/wiki/MD5
-    FuncInfo('MD6', FuncInfo.HASH, None, 104, 16, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/MD6
-    FuncInfo('RIPEMD160', FuncInfo.HASH, None, 80, 48, block_size=20, year=1992),  # https://ehash.iaik.tugraz.at/wiki/RIPEMD  https://en.wikipedia.org/wiki/RIPEMD
+    FuncInfo('MD5', FuncInfo.HASH, None, 64, None, block_size=16, year=1992, ctype=FConstType.MERKLED),  # https://ehash.iaik.tugraz.at/wiki/MD5
+    FuncInfo('MD6', FuncInfo.HASH, None, 104, 16, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/MD6  https://scholarworks.rit.edu/cgi/viewcontent.cgi?referer=&httpsredir=1&article=1653&context=theses
+    FuncInfo('RIPEMD160', FuncInfo.HASH, None, 80, 48, block_size=20, year=1992),  # https://ehash.iaik.tugraz.at/wiki/RIPEMD  https://en.wikipedia.org/wiki/RIPEMD  https://eprint.iacr.org/2012/049.pdf
     FuncInfo('SHA1', FuncInfo.HASH, None, 80, 80, block_size=20, year=1995, ctype=FConstType.MERKLED),  # https://en.wikipedia.org/wiki/SHA-1
     FuncInfo('SHA2', FuncInfo.HASH, None, 64, 31, block_size=32, year=2001, ctype=FConstType.MERKLED),  # https://en.wikipedia.org/wiki/SHA-2
     FuncInfo('SHA3', FuncInfo.HASH, None, 24, 5, block_size=32, year=2016, ctype=FConstType.SPONGE),  # https://en.wikipedia.org/wiki/SHA-3
@@ -199,13 +203,13 @@ FUNC_DB.add_all([
     FuncInfo('Tangle2', FuncInfo.HASH, None, 80, None, block_size=32, year=2008),
     FuncInfo('Tiger', FuncInfo.HASH, None, 23, 19, block_size=24, year=1996, ctype=FConstType.MERKLED),  # https://ehash.iaik.tugraz.at/wiki/Tiger
     FuncInfo('Twister', FuncInfo.HASH, None, 9, 9, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/Twister
-    FuncInfo('Whirlpool', FuncInfo.HASH, None, 10, 6, block_size=64, year=2000, ctype=FConstType.MPRENEL),  # https://ehash.iaik.tugraz.at/wiki/Whirlpool  https://en.wikipedia.org/wiki/Whirlpool_(hash_function)
+    FuncInfo('Whirlpool', FuncInfo.HASH, None, 10, 10, block_size=64, year=2000, ctype=FConstType.MPRENEL),  # https://ehash.iaik.tugraz.at/wiki/Whirlpool  https://en.wikipedia.org/wiki/Whirlpool_(hash_function) https://diglib.tugraz.at/download.php?id=576a7a85b2dc5&location=browse "Analysis of Cryptographic Hash Functions"
 
-    FuncInfo('Chacha', FuncInfo.CIPHER, FuncInfo.STREAM, 20, None, block_size=32, key_size=32, iv_size=8, year=2008, ctype=FConstType.ARX),  # https://cr.yp.to/chacha.html
+    FuncInfo('Chacha', FuncInfo.CIPHER, FuncInfo.STREAM, 20, 6, block_size=32, key_size=32, iv_size=8, year=2008, ctype=FConstType.ARX),  # https://cr.yp.to/chacha.html  https://eprint.iacr.org/2018/688.pdf
     FuncInfo('DECIM', FuncInfo.CIPHER, FuncInfo.STREAM, 8, None, block_size=24, key_size=10, iv_size=8, year=2005),  # https://en.wikipedia.org/wiki/DECIM
     FuncInfo('F-FCSR', FuncInfo.CIPHER, FuncInfo.STREAM, 5, 5, block_size=16, key_size=16, iv_size=8, year=2005),  # https://en.wikipedia.org/wiki/F-FCSR  https://www.iacr.org/archive/asiacrypt2008/53500563/53500563.pdf
     FuncInfo('Fubuki', FuncInfo.CIPHER, FuncInfo.STREAM, 4, None, block_size=16, key_size=16, iv_size=16, year=2005),  # https://www.ecrypt.eu.org/stream/cryptmtfubuki.html
-    FuncInfo('Grain', FuncInfo.CIPHER, FuncInfo.STREAM, 13, None, block_size=16, key_size=16, iv_size=12, year=2005),  # https://www.ecrypt.eu.org/stream/grain.html
+    FuncInfo('Grain', FuncInfo.CIPHER, FuncInfo.STREAM, 13, 13, block_size=16, key_size=16, iv_size=12, year=2005),  # https://www.ecrypt.eu.org/stream/grain.html https://www.researchgate.net/publication/220334177_An_Experimentally_Verified_Attack_on_Full_Grain-128_Using_Dedicated_Reconfigurable_Hardware  https://link.springer.com/content/pdf/10.1007/s11424-018-7170-4.pdf
     FuncInfo('HC-128', FuncInfo.CIPHER, FuncInfo.STREAM, 1, None, block_size=16, key_size=16, iv_size=16, year=2005),  # https://www.ecrypt.eu.org/stream/hc256.html
     FuncInfo('Hermes', FuncInfo.CIPHER, FuncInfo.STREAM, 10, None, block_size=16, key_size=10, iv_size=0, year=2005),  # https://www.ecrypt.eu.org/stream/hermes8.html
     FuncInfo('LEX', FuncInfo.CIPHER, FuncInfo.STREAM, 10, None, block_size=16, key_size=16, iv_size=16, year=2005),  # https://www.ecrypt.eu.org/stream/lex.html
@@ -213,9 +217,9 @@ FUNC_DB.add_all([
     FuncInfo('RC4', FuncInfo.CIPHER, FuncInfo.STREAM, 1, None, block_size=32, key_size=16, iv_size=0, year=1994),  # https://en.wikipedia.org/wiki/RC4
     FuncInfo('Rabbit', FuncInfo.CIPHER, FuncInfo.STREAM, 4, None, block_size=16, key_size=16, iv_size=8, year=2005),  # https://en.wikipedia.org/wiki/Rabbit_(cipher)
     FuncInfo('SOSEMANUK', FuncInfo.CIPHER, FuncInfo.STREAM, 25, None, block_size=16, key_size=16, iv_size=16, year=2005),  # https://en.wikipedia.org/wiki/SOSEMANUK
-    FuncInfo('Salsa20', FuncInfo.CIPHER, FuncInfo.STREAM, 20, None, block_size=8, key_size=16, iv_size=8, year=2007, ctype=FConstType.ARX),  # https://en.wikipedia.org/wiki/Salsa20
+    FuncInfo('Salsa20', FuncInfo.CIPHER, FuncInfo.STREAM, 20, 6, block_size=8, key_size=16, iv_size=8, year=2007, ctype=FConstType.ARX),  # https://en.wikipedia.org/wiki/Salsa20  https://eprint.iacr.org/2018/688.pdf
     FuncInfo('TSC-4', FuncInfo.CIPHER, FuncInfo.STREAM, 32, None, block_size=32, key_size=10, iv_size=10, year=2006),  # https://www.ecrypt.eu.org/stream/papersdir/2006/024.pdf
-    FuncInfo('Trivium', FuncInfo.CIPHER, FuncInfo.STREAM, 9, None, block_size=8, key_size=10, iv_size=10, year=2005),  # https://en.wikipedia.org/wiki/Trivium_(cipher)
+    FuncInfo('Trivium', FuncInfo.CIPHER, FuncInfo.STREAM, 8, 5.8, block_size=8, key_size=10, iv_size=10, year=2005),  # https://en.wikipedia.org/wiki/Trivium_(cipher)  https://lucris.lub.lu.se/ws/portalfiles/portal/5893712/609243.pdf https://www.researchgate.net/publication/301795117_Observing_biases_in_the_state_Case_studies_with_Trivium_and_Trivia-SC  829//144
 
     FuncInfo('gmimc-S45a', FuncInfo.CIPHER, FuncInfo.MPC, 121, year=2019, ctype=FConstType.FN),  # https://eprint.iacr.org/2019/397
     FuncInfo('gmimc-S45b', FuncInfo.CIPHER, FuncInfo.MPC, 137, year=2019, ctype=FConstType.FN),
