@@ -28,7 +28,7 @@ class FuncInfo:
     LIGHT = 8
 
     def __init__(self, fname, ftype, stype=None, max_rounds=None, human_broken_rounds=None, partial_rounds=None,
-                 block_size=None, key_size=None, iv_size=None, year=None, ctype=None):
+                 block_size=None, key_size=None, iv_size=None, hash_size=None, year=None, ctype=None):
         self.fname = fname
         self.ftype = ftype
         self.stype = stype or 0
@@ -36,6 +36,7 @@ class FuncInfo:
         self.partial_rounds = partial_rounds
         self.human_broken_rounds = human_broken_rounds
         self.block_size = block_size
+        self.hash_size = hash_size
         self.key_size = key_size
         self.iv_size = iv_size
         self.year = year
@@ -170,7 +171,7 @@ FUNC_DB.add_all([
     FuncInfo('Cheetah', FuncInfo.HASH, None, 16, 12, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/Cheetah
     FuncInfo('CubeHash', FuncInfo.HASH, None, 8, None, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/CubeHash
     FuncInfo('DCH', FuncInfo.HASH, None, 4, 4, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/DCH
-    FuncInfo('DynamicSHA', FuncInfo.HASH, None, 16, None, block_size=48, year=2008),  # https://ehash.iaik.tugraz.at/wiki/Dynamic_SHA
+    FuncInfo('DynamicSHA', FuncInfo.HASH, None, 16, None, block_size=48, hash_size=64, year=2008),  # https://ehash.iaik.tugraz.at/wiki/Dynamic_SHA
     FuncInfo('DynamicSHA2', FuncInfo.HASH, None, 17, 17, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/Dynamic_SHA2
     FuncInfo('ECHO', FuncInfo.HASH, None, 8, 4, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/ECHO
     FuncInfo('ESSENCE', FuncInfo.HASH, None, 32, None, block_size=32, year=2008),  # https://ehash.iaik.tugraz.at/wiki/ESSENCE

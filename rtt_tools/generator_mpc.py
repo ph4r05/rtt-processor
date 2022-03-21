@@ -1415,10 +1415,10 @@ def generate_prng_inp(algorithm, data_size, cround=1, tv_size=None, key_size=Non
                             key_stream)
 
 
-def generate_hash_inp(algorithm, data_size, cround=1, tv_size=None, key_size=None, iv_size=None, nexps=3, eprefix='',
-                      streams=StreamOptions.CTR_LHW_SAC, key_stream=StreamOptions.RND):
+def generate_hash_inp(algorithm, data_size, cround=1, tv_size=None, key_size=None, iv_size=None, hash_size=None,
+                      nexps=3, eprefix='', streams=StreamOptions.CTR_LHW_SAC, key_stream=StreamOptions.RND):
     return generate_cfg_inp('hash', algorithm, data_size, cround, tv_size, key_size, iv_size, nexps, eprefix, streams,
-                            key_stream)
+                            key_stream, hash_size=hash_size)
 
 
 def generate_block_inp(algorithm, data_size, cround=1, tv_size=None, key_size=None, iv_size=None, nexps=3, eprefix='',
@@ -1435,7 +1435,7 @@ def generate_stream_inp(algorithm, data_size, cround=1, tv_size=None, key_size=N
 
 def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=None, key_size=None, iv_size=None, nexps=3,
                      eprefix='', streams=StreamOptions.CTR_LHW_SAC, key_stream=StreamOptions.RND,
-                     randomize_seed=False):
+                     randomize_seed=False, hash_size=None):
     """
     Generates cryptostreams-based hash/block/stream cipher/prng config with plaintext/source input strategies
     """
@@ -1454,6 +1454,13 @@ def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=None, key
         tv_size = tv_size if tv_size else erec.block_size
         key_size = key_size if key_size else erec.key_size
         iv_size = iv_size if iv_size else erec.iv_size
+        hash_size = hash_size if hash_size else erec.hash_size
+
+    hash_size = hash_size if hash_size else tv_size
+    block_size = tv_size
+    input_size = tv_size
+    if is_hash:
+        tv_size = hash_size
 
     if is_prng and streams != StreamOptions.ZERO:
         raise ValueError('PRNG does not allow input stream other than zero')
@@ -1500,7 +1507,7 @@ def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=None, key
                 "type": alg_type,
                 "algorithm": algorithm,
                 "round": cround,
-                "block_size": tv_size,
+                "block_size": block_size,
                 "init_frequency": "only_once",
             },
             "note": note
@@ -1508,8 +1515,8 @@ def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=None, key
 
         if is_hash:
             tpl['stream']['source'] = inp_config
-            tpl['stream']['hash_size'] = tv_size
-            tpl['stream']['input_size'] = tv_size
+            tpl['stream']['hash_size'] = hash_size
+            tpl['stream']['input_size'] = input_size
 
         elif is_prng:
             tpl['stream'] = {

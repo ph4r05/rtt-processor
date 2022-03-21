@@ -1374,7 +1374,7 @@ class Cleaner:
                                 agg_scripts += generate_cfg_inp(
                                     alg_type, funcname, size, cround=rnd,
                                     tv_size=erec.block_size, key_size=erec.key_size, iv_size=erec.iv_size,
-                                    nexps=3, eprefix=eprefix,
+                                    hash_size=erec.hash_size, nexps=3, eprefix=eprefix,
                                     streams=prim_stream, key_stream=sec_stream_str, randomize_seed=True)
 
                         except Exception as e:
