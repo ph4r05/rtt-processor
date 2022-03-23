@@ -1480,7 +1480,7 @@ def generate_cfg_inp(alg_type, algorithm, data_size, cround=1, tv_size=None, key
     seed_randomizer_src = f'{alg_type}:{algorithm}'.encode('utf8')
     seed_randomizer = hashlib.sha256(seed_randomizer_src).hexdigest()[:8]
 
-    agg_inputs = generate_streams(tv_count=tv_count, tv_size=tv_size, streams=streams, nexps=nexps,
+    agg_inputs = generate_streams(tv_count=tv_count, tv_size=block_size, streams=streams, nexps=nexps,
                                   seed_randomizer=seed_randomizer if randomize_seed else None)
     agg_scripts = []
     for configs in agg_inputs:
