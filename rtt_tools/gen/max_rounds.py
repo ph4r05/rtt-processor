@@ -150,11 +150,11 @@ FUNC_DB.add_all([
     FuncInfo('ROAD-RUNNER-K80', FuncInfo.CIPHER, FuncInfo.LIGHT, 10, 8, block_size=8, key_size=10, iv_size=16, year=2015, ctype=FConstType.FN),  # https://eprint.iacr.org/2018/688.pdf
     FuncInfo('ROBIN', FuncInfo.CIPHER, None, 16, 16, block_size=16, key_size=16, iv_size=16, year=2014, ctype=FConstType.SPN),  # https://who.paris.inria.fr/Gaetan.Leurent/files/LS_FSE14.pdf
     FuncInfo('ROBIN-STAR', FuncInfo.CIPHER, None, 16, None, block_size=16, key_size=16, iv_size=16, year=2017, ctype=FConstType.SPN),  # https://fenix.tecnico.ulisboa.pt/downloadFile/281870113704550/Extended_Abstract-Choosing_the_Future_of_Lightweight_Encryption_Algorithms.pdf
-    FuncInfo('SEED', FuncInfo.CIPHER, None, 16, None, block_size=16, key_size=16, iv_size=16, year=1998, ctype=FConstType.FN),  # https://en.wikipedia.org/wiki/SEED
+    FuncInfo('SEED', FuncInfo.CIPHER, None, 16, 7, block_size=16, key_size=16, iv_size=16, year=1998, ctype=FConstType.FN),  # https://en.wikipedia.org/wiki/SEED  https://www.researchgate.net/publication/221327131_Known-Key_Distinguishers_for_Some_Block_Ciphers
     FuncInfo('SERPENT', FuncInfo.CIPHER, None, 32, 5, block_size=16, key_size=16, iv_size=16, year=1998, ctype=FConstType.SPN),  # https://en.wikipedia.org/wiki/Serpent_(cipher)
     FuncInfo('SHACAL2', FuncInfo.CIPHER, None, 80, 44, block_size=32, key_size=64, iv_size=16, year=2000, ctype=FConstType.HASH),  # https://www.researchgate.net/publication/220237385_Attacking_44_Rounds_of_the_SHACAL-2_Block_Cipher_Using_Related-Key_Rectangle_Cryptanalysis https://github.com/odzhan/tinycrypt/blob/master/block/shacal2/doc/10.1.1.3.4066.pdf
     FuncInfo('SIMON', FuncInfo.CIPHER, None, 68, 26, block_size=16, key_size=16, iv_size=16, year=2013, ctype=FConstType.SPN),  # https://eprint.iacr.org/2018/688.pdf
-    FuncInfo('SINGLE-DES', FuncInfo.CIPHER, None, 16, 16, block_size=8, key_size=7, iv_size=16, year=1977, ctype=FConstType.FN),  # https://en.wikipedia.org/wiki/Data_Encryption_Standard
+    FuncInfo('SINGLE-DES', FuncInfo.CIPHER, None, 16, 7, block_size=8, key_size=7, iv_size=16, year=1977, ctype=FConstType.FN),  # https://en.wikipedia.org/wiki/Data_Encryption_Standard https://www.researchgate.net/publication/221327131_Known-Key_Distinguishers_for_Some_Block_Ciphers
     FuncInfo('SPARX-B128', FuncInfo.CIPHER, FuncInfo.LIGHT, 32, 8, block_size=16, key_size=16, iv_size=16, year=2016, ctype=FConstType.ARX),  # https://www.cryptolux.org/index.php/SPARX
     FuncInfo('SPARX-B64', FuncInfo.CIPHER, FuncInfo.LIGHT, 24, 8, block_size=8, key_size=16, iv_size=16, year=2016, ctype=FConstType.ARX),
     FuncInfo('SPECK', FuncInfo.CIPHER, FuncInfo.LIGHT, 32, 15, block_size=16, key_size=16, iv_size=16, year=2013, ctype=FConstType.ARX),

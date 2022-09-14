@@ -246,6 +246,8 @@ class StreamOptions:
     SAC = 8
     RND = 16
     ORND = 32
+    RLHW = 64
+    ORLHW = 128
 
     CTR_LHW = CTR | LHW
     CTR_LHW_SAC = CTR_LHW | SAC
@@ -277,9 +279,21 @@ class StreamOptions:
         return (x & StreamOptions.ORND) > 0
 
     @staticmethod
+    def has_rnd_lhw(x):
+        return (x & StreamOptions.RLHW) > 0
+
+    @staticmethod
+    def has_rnd_lhw_once(x):
+        return (x & StreamOptions.ORLHW) > 0
+
+    @staticmethod
     def from_str(x):
         if 'ctr' in x:
             return StreamOptions.CTR
+        elif 'orhw' in x:
+            return StreamOptions.ORLHW
+        elif 'rhw' in x:
+            return StreamOptions.RLHW
         elif 'hw' in x:
             return StreamOptions.LHW
         elif 'sac' in x:
@@ -1219,6 +1233,13 @@ def get_single_stream(stream, bsize=None, offset=None, tv_count=None, weight=Non
         weight = weight if weight else comp_hw_weight(bsize, samples=nsamples or 1, min_samples=tv_count)
         return make_hw_config(bsize, weight=weight, offset_range=offset / float(nsamples or 1),
                               tv_count=tv_count, return_aux=True).core
+    elif StreamOptions.has_rnd_lhw(stream):
+        weight = weight if weight else comp_hw_weight(bsize, samples=nsamples or 1, min_samples=tv_count)
+        return make_hw_config(bsize, weight=weight, offset_range=offset / float(nsamples or 1),
+                              tv_count=tv_count, return_aux=True, random_start=True).core
+    elif StreamOptions.has_rnd_lhw_once(stream):
+        return {"type": "single_value_stream", "source": get_single_stream(StreamOptions.RLHW, bsize, offset, tv_count, weight, nsamples)}
+
     else:
         raise ValueError(f'Unsupported single stream: {stream}')
 
@@ -1315,6 +1336,32 @@ def generate_streams(tv_count, tv_size, streams=StreamOptions.CTR_LHW, nexps=3, 
             StreamRec(stype='zero', sdesc=f'{tv_size * 8}sbit-offset-{ix}', sscript=sscript,
                       expid=ix, seed=merge_seeds(int_to_seed(5 * nexps + ix), seed_randomizer))
         )
+
+    # RLHW
+    weight_rhw = weight or 3
+    for ix in range(nexps if StreamOptions.has_rnd_once(streams) else 0):
+        sscript = make_hw_config(tv_size, weight=weight_rhw, offset_range=0.0,
+                                 tv_count=tv_count, return_aux=True,
+                                 seed=merge_seeds(int_to_seed(nexps + ix), seed_randomizer),
+                                 random_start=True)  # type: HwConfig
+        agg_inputs.append(
+            StreamRec(stype=f'rhw{weight_rhw}', sdesc=sscript.note, sscript=sscript.core,
+                      expid=ix, seed=merge_seeds(int_to_seed(6 * nexps + ix), seed_randomizer))
+        )
+
+    # OLHW
+    weight_orhw = weight or 3
+    for ix in range(nexps if StreamOptions.has_rnd_once(streams) else 0):
+        sscript = make_hw_config(tv_size, weight=weight_orhw, offset_range=0.0,
+                                 tv_count=tv_count, return_aux=True,
+                                 seed=merge_seeds(int_to_seed(nexps + ix), seed_randomizer),
+                                 random_start=True)  # type: HwConfig
+        agg_inputs.append(
+            StreamRec(stype=f'orhw{weight_orhw}', sdesc=sscript.note,
+                      sscript={"type": "single_value_stream", "source": sscript.core},
+                      expid=ix, seed=merge_seeds(int_to_seed(7 * nexps + ix), seed_randomizer))
+        )
+
     return agg_inputs
 
 
