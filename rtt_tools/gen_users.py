@@ -149,7 +149,16 @@ import base64
 import hashlib
 import json
 
-db = [(u, *gen_password()) for u in users]
+def gen_password():
+    passwd = secrets.token_urlsafe(18)
+    salt = secrets.token_urlsafe(12)
+    res = base64.b64encode(hashlib.pbkdf2_hmac('sha256', passwd.encode('ascii'), salt.encode('ascii'), 100000))
+    return passwd, 'pbkdf2_sha256$100000$%s$%s' % (salt, res.decode('ascii'))
+
+users = '''uco1
+uco2'''.split('\n')
+
+db = [(u.strip(), *gen_password()) for u in users if u.strip()]
 dbd = []
 
 for ux in db:
@@ -159,6 +168,9 @@ sql = "INSERT INTO auth_user(password, last_login, is_superuser, username, first
 
 db2=[[f'x{u[0]}',u[1]] for u in db]
 print(json.dumps(db2, indent=2))
+
+ulist = ','.join([f'"x{ux[0]}"' for ux in db])
+sql_del = f"DELETE FROM auth_user WHERE username IN ({ulist})"
 
 with(open('/tmp/rtt_accs.txt', 'w+')) as fh:
     json.dump(db2, fh, indent=2)
