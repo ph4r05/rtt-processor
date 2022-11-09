@@ -605,3 +605,90 @@ rr += list(itertools.chain.from_iterable(
 g.write_submit_obj(rr)
 ```
 
+# Aux
+
+```python
+import os, shutil, itertools
+from rtt_tools import generator_mpc as g
+dname = '/tmp/ggen68'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]
+
+rr += list(itertools.chain.from_iterable(
+    [g.generate_stream_col('DECIM', 100*1024*1024, r, eprefix='PH4-SM-68-', streams=g.StreamOptions.LHW) for r in range(4,6)]))
+rr += list(itertools.chain.from_iterable(
+    [g.generate_block_inp('GOST', 1000*1024*1024, r, eprefix='PH4-SM-68-', streams=g.StreamOptions.LHW) for r in range(29, 33)]))
+
+g.write_submit_obj(rr)
+```
+
+# Aux2
+
+```python
+import os, shutil, itertools
+from rtt_tools import generator_mpc as g
+EXP=75
+dname = f'/tmp/ggen{EXP}'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]; eprefix=f'PH4-SM-{EXP}-'
+
+rr += g.generate_stream_inp('Grain', 1000*1024*1024, 4, eprefix=eprefix, streams=g.StreamOptions.ZERO)
+rr += g.generate_stream_inp('Grain', 1000*1024*1024, 5, eprefix=eprefix, streams=g.StreamOptions.ZERO)
+rr += g.generate_stream_col('Grain', 100*1024*1024, 5, eprefix=eprefix, streams=g.StreamOptions.SAC)
+rr += g.generate_stream_col('Grain', 100*1024*1024, 6, eprefix=eprefix, streams=g.StreamOptions.SAC)
+rr += g.generate_stream_col('Grain', 100*1024*1024, 7, eprefix=eprefix, streams=g.StreamOptions.SAC)
+rr += g.generate_stream_col('Grain', 1000*1024*1024, 8, eprefix=eprefix, streams=g.StreamOptions.RND)
+rr += g.generate_stream_col('Grain', 1000*1024*1024, 8, eprefix=eprefix, streams=g.StreamOptions.LHW)
+rr += g.generate_stream_col('Grain', 1000*1024*1024, 11, eprefix=eprefix, streams=g.StreamOptions.LHW)
+rr += g.generate_stream_col('Grain', 1000*1024*1024, 11, eprefix=eprefix, streams=g.StreamOptions.SAC)
+
+# rr += list(itertools.chain.from_iterable(
+#     [g.generate_stream_col('DECIM', 100*1024*1024, r, eprefix='PH4-SM-68-', streams=g.StreamOptions.LHW) for r in range(4,6)]))
+# rr += list(itertools.chain.from_iterable(
+#     [g.generate_block_inp('GOST', 1000*1024*1024, r, eprefix='PH4-SM-68-', streams=g.StreamOptions.LHW) for r in range(29, 33)]))
+
+g.write_submit_obj(rr)
+```
+
+# Aux3
+
+```python
+import os, shutil, itertools
+from rtt_tools import generator_mpc as g
+EXP=78
+dname = f'/tmp/exps-{EXP}'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]; eprefix=f'PH4-SM-{EXP}-'
+
+rr += g.generate_stream_col('Grain', 100*1024*1024, 5, eprefix=eprefix, streams=g.StreamOptions.RND)
+rr += g.generate_stream_col('Grain', 100*1024*1024, 6, eprefix=eprefix, streams=g.StreamOptions.RND)
+rr += g.generate_stream_col('Grain', 100*1024*1024, 7, eprefix=eprefix, streams=g.StreamOptions.RND)
+rr += g.generate_stream_col('Grain', 1000*1024*1024, 3, eprefix=eprefix, streams=g.StreamOptions.RND)
+rr += g.generate_stream_col('Grain', 1000*1024*1024, 8, eprefix=eprefix, streams=g.StreamOptions.SAC)
+
+# rr += list(itertools.chain.from_iterable(
+#     [g.generate_stream_col('DECIM', 100*1024*1024, r, eprefix='PH4-SM-68-', streams=g.StreamOptions.LHW) for r in range(4,6)]))
+# rr += list(itertools.chain.from_iterable(
+#     [g.generate_block_inp('GOST', 1000*1024*1024, r, eprefix='PH4-SM-68-', streams=g.StreamOptions.LHW) for r in range(29, 33)]))
+
+g.write_submit_obj(rr)
+```
+
+
+```python
+import os, shutil, itertools
+from rtt_tools import generator_mpc as g
+EXP=82
+dname = f'/tmp/exps-{EXP}'
+shutil.rmtree(dname, ignore_errors=True)
+os.makedirs(dname, exist_ok=True)
+os.chdir(dname); rr=[]; eprefix=f'PH4-SM-{EXP}-'
+
+rr += g.generate_hash_inp('DynamicSHA', 10*1024*1024, 12, eprefix=eprefix, streams=g.StreamOptions.CTR)
+g.write_submit_obj(rr)
+```
+
+
