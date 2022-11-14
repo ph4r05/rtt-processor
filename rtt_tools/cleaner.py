@@ -977,7 +977,7 @@ class Cleaner:
 
     def fix_1000MB(self, from_id=None, exp_count=3):
         """1000MB experiments could have HW configuration that was overlaping / overflowing
-        We have to recompute HW weight so it can cover the whole interval without overlaps"""
+        We have to recompute HW weight, so it can cover the whole interval without overlaps"""
 
         with self.conn.cursor() as c:
             bad_hws = []

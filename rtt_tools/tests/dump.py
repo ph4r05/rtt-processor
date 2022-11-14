@@ -45,6 +45,10 @@ class RttDumpTest(unittest.TestCase):
         self.assertEqual(r.fnc, 'XTEA')
         self.assertEqual(r.osize, 10 * 1024 * 1024)
 
+        r = l.break_exp_ph4('PH4-SM-82-DynamicSHA-t:hash-r:12-b:64-s:10MiB-e:1-i:hw-hw-512bit-hw3-offsetidx-7412906-offset-64-229-334-r0.33-vecsize-14825814-10.00MB')
+        self.assertEqual(r.fnc, 'DynamicSHA')
+        self.assertEqual(r.osize, 10 * 1024 * 1024)
+
     def test_mpc(self):
         l = Loader()
         r1 = l.break_exp_ph4_mpc('testmpc02-lowmc-s128b-bin-raw-r6-inp-ctr00-b16-spr--s100MB.json')
