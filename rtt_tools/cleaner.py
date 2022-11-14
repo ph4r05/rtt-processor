@@ -1280,7 +1280,8 @@ class Cleaner:
                 fh.write(f"submit_experiment --all_batteries --name '{nname}' --cfg '/home/debian/rtt-home/RTTWebInterface/media/predefined_configurations/{ssize}MB.json' {ptype} '{fname}'\n")
 
     def comp_new_rounds_new(self, specs, tmpdir='/tmp/rspecs', smidx=5, skip_existing_since=None, new_size=None,
-                            clean_before=False, randomize_seed=False, skip_mpc=False, skip_large=False):
+                            clean_before=False, randomize_seed=False, skip_mpc=False, skip_large=False,
+                            exp_prefix='PH4-SM'):
         """
         Generates submit_experiment for a new rounds to compute.
         specs is: ftype:fname -> meth:size -> [rounds]
@@ -1291,7 +1292,7 @@ class Cleaner:
             shutil.rmtree(tmpdir)
         os.makedirs(tmpdir, exist_ok=True)
 
-        eprefix = 'PH4-SM-%02d-' % smidx
+        eprefix = '%s-%02d-' % (exp_prefix, smidx)
         eprefix_mpc = 'testmpc%02d-' % smidx
         agg_scripts = []  # type: list[ExpRec]
 
