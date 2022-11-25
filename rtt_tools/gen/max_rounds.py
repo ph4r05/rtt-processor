@@ -122,16 +122,16 @@ FUNC_DB.add_all([
 
     FuncInfo('AES', FuncInfo.CIPHER, None, 10, 6, block_size=16, key_size=16, iv_size=16, year=2001, ctype=FConstType.SPN),
     FuncInfo('ARIA', FuncInfo.CIPHER, None, 12, 4, block_size=16, key_size=16, iv_size=16, year=2003, ctype=FConstType.SPN),  # https://en.wikipedia.org/wiki/ARIA_(cipher)
-    FuncInfo('Blowfish', FuncInfo.CIPHER, None, 16, 4, block_size=8, key_size=32, iv_size=16, year=1993, ctype=FConstType.FN),
+    FuncInfo('BLOWFISH', FuncInfo.CIPHER, None, 16, 4, block_size=8, key_size=32, iv_size=16, year=1993, ctype=FConstType.FN),
     FuncInfo('Camelia', FuncInfo.CIPHER, None, 18, 8, block_size=16, key_size=16, iv_size=16, year=2000, ctype=FConstType.FN),
-    FuncInfo('Camellia', FuncInfo.CIPHER, None, 18, 8, block_size=16, key_size=16, iv_size=16, year=2000, ctype=FConstType.FN),
-    FuncInfo('Cast', FuncInfo.CIPHER, None, 12, 9, block_size=8, key_size=16, iv_size=16, year=1996, ctype=FConstType.FN),  # https://en.wikipedia.org/wiki/CAST-128
-    FuncInfo('Chaskey', FuncInfo.CIPHER, FuncInfo.LIGHT, 16, 7, block_size=16, key_size=16, iv_size=16, year=2014, ctype=FConstType.ARX),  # https://mouha.be/chaskey/
-    FuncInfo('Fantomas', FuncInfo.CIPHER, None, 12, 5, block_size=16, key_size=16, iv_size=16, year=2014, ctype=FConstType.SPN),  # https://www.mdpi.com/2410-387X/3/1/4/htm https://who.paris.inria.fr/Gaetan.Leurent/files/LS_FSE14.pdf
-    FuncInfo('Gost', FuncInfo.CIPHER, None, 32, 20, block_size=8, key_size=32, iv_size=16, year=1994, ctype=FConstType.FN),  # https://cryptography.fandom.com/wiki/GOST_(block_cipher), att: https://eprint.iacr.org/2011/312.pdf https://eprint.iacr.org/2017/487.pdf
-    FuncInfo('Hight', FuncInfo.CIPHER, FuncInfo.LIGHT, 32, 18, block_size=8, key_size=16, iv_size=16, year=2006, ctype=FConstType.FN),  # https://link.springer.com/chapter/10.1007/11894063_4 https://ieeexplore.ieee.org/document/8109901./ https://www.researchgate.net/profile/Bing-Sun-14/publication/221282558_Saturation_Attack_on_the_Block_Cipher_HIGHT/ https://eprint.iacr.org/2018/688.pdf
-    FuncInfo('Idea', FuncInfo.CIPHER, None, 8, 4, block_size=8, key_size=16, iv_size=16, year=1991, ctype=FConstType.LMS),  # https://en.wikipedia.org/wiki/International_Data_Encryption_Algorithm
-    FuncInfo('Kasumi', FuncInfo.CIPHER, None, 8, 8, block_size=8, key_size=16, iv_size=16, year=2005, ctype=FConstType.FN),
+    FuncInfo('CAMELLIA', FuncInfo.CIPHER, None, 18, 8, block_size=16, key_size=16, iv_size=16, year=2000, ctype=FConstType.FN),
+    FuncInfo('CAST', FuncInfo.CIPHER, None, 12, 9, block_size=8, key_size=16, iv_size=16, year=1996, ctype=FConstType.FN),  # https://en.wikipedia.org/wiki/CAST-128
+    FuncInfo('CHASKEY', FuncInfo.CIPHER, FuncInfo.LIGHT, 16, 7, block_size=16, key_size=16, iv_size=16, year=2014, ctype=FConstType.ARX),  # https://mouha.be/chaskey/
+    FuncInfo('FANTOMAS', FuncInfo.CIPHER, None, 12, 5, block_size=16, key_size=16, iv_size=16, year=2014, ctype=FConstType.SPN),  # https://www.mdpi.com/2410-387X/3/1/4/htm https://who.paris.inria.fr/Gaetan.Leurent/files/LS_FSE14.pdf
+    FuncInfo('GOST', FuncInfo.CIPHER, None, 32, 20, block_size=8, key_size=32, iv_size=16, year=1994, ctype=FConstType.FN),  # https://cryptography.fandom.com/wiki/GOST_(block_cipher), att: https://eprint.iacr.org/2011/312.pdf https://eprint.iacr.org/2017/487.pdf
+    FuncInfo('HIGHT', FuncInfo.CIPHER, FuncInfo.LIGHT, 32, 18, block_size=8, key_size=16, iv_size=16, year=2006, ctype=FConstType.FN),  # https://link.springer.com/chapter/10.1007/11894063_4 https://ieeexplore.ieee.org/document/8109901./ https://www.researchgate.net/profile/Bing-Sun-14/publication/221282558_Saturation_Attack_on_the_Block_Cipher_HIGHT/ https://eprint.iacr.org/2018/688.pdf
+    FuncInfo('IDEA', FuncInfo.CIPHER, None, 8, 4, block_size=8, key_size=16, iv_size=16, year=1991, ctype=FConstType.LMS),  # https://en.wikipedia.org/wiki/International_Data_Encryption_Algorithm
+    FuncInfo('KASUMI', FuncInfo.CIPHER, None, 8, 8, block_size=8, key_size=16, iv_size=16, year=2005, ctype=FConstType.FN),
     FuncInfo('KUZNYECHIK', FuncInfo.CIPHER, None, 10, 4, block_size=16, key_size=32, iv_size=16, year=2015, ctype=FConstType.SPN),  # https://en.wikipedia.org/wiki/Kuznyechik
     FuncInfo('LBLOCK', FuncInfo.CIPHER, None, 32, 24, block_size=8, key_size=10, iv_size=16, year=2011, ctype=FConstType.FN),
     FuncInfo('LEA', FuncInfo.CIPHER, None, 24, 8, block_size=16, key_size=16, iv_size=16, year=2013, ctype=FConstType.ARX),  # https://ieeexplore.ieee.org/document/8109901./keywords#keywords https://eprint.iacr.org/2018/688.pdf
@@ -141,7 +141,7 @@ FUNC_DB.add_all([
     FuncInfo('NOEKEON', FuncInfo.CIPHER, None, 16, 4, block_size=16, key_size=16, iv_size=16, year=2009, ctype=FConstType.SPN),  # https://en.wikipedia.org/wiki/NOEKEON
     FuncInfo('PICCOLO', FuncInfo.CIPHER, None, 25, 5, block_size=8, key_size=10, iv_size=16, year=2011, ctype=FConstType.FN),  # https://www.koreascience.or.kr/article/JAKO201932365651180.page
     FuncInfo('PRIDE', FuncInfo.CIPHER, None, 20, 19, block_size=8, key_size=16, iv_size=16, year=2014, ctype=FConstType.SPN),  # https://eprint.iacr.org/2014/656.pdf
-    FuncInfo('Prince', FuncInfo.CIPHER, None, 12, 6, block_size=8, key_size=16, iv_size=16, year=2012, ctype=FConstType.SPN),  # https://en.wikipedia.org/wiki/Prince_(cipher)
+    FuncInfo('PRINCE', FuncInfo.CIPHER, None, 12, 6, block_size=8, key_size=16, iv_size=16, year=2012, ctype=FConstType.SPN),  # https://en.wikipedia.org/wiki/Prince_(cipher)
     FuncInfo('RC5-20', FuncInfo.CIPHER, None, 20, 17, block_size=8, key_size=16, iv_size=16, year=1997, ctype=FConstType.FN),  # https://media.hotnews.ro/media_server1/document-2012-05-9-12207779-0-articolul-semnat-ioan-mang.pdf
     FuncInfo('RC6', FuncInfo.CIPHER, None, 20, 5, block_size=16, key_size=16, iv_size=16, year=1997, ctype=FConstType.GFN),  # https://www.cryptrec.go.jp/exreport/cryptrec-ex-1086-2000.pdf  https://media.hotnews.ro/media_server1/document-2012-05-9-12207779-0-articolul-semnat-ioan-mang.pdf
     FuncInfo('RECTANGLE-K128', FuncInfo.CIPHER, FuncInfo.LIGHT, 25, 14, block_size=8, key_size=16, iv_size=16, year=2014, ctype=FConstType.SPN),  # https://eprint.iacr.org/2014/084.pdf
