@@ -822,6 +822,8 @@ class Loader:
                             help='Flag for security margins experiment')
         parser.add_argument('--is-ph4-sm', dest='is_ph4_sm', type=int, default=0,
                             help='Flag for PH4-SM experiment')
+        parser.add_argument('--is-syso-sm', dest='is_syso_sm', type=int, default=0,
+                            help='Flag for SYSO-SM experiment')
         parser.add_argument('--is-ph4-mpc', dest='is_ph4_mpc', type=int, default=0,
                             help='Flag for PH4-MPC experiment')
         parser.add_argument('--is-ph4-ref', dest='is_ph4_ref', type=int, default=0,
@@ -910,8 +912,8 @@ class Loader:
             ei.fnc_block = m.group(3)
         return ei
 
-    def break_exp_ph4(self, s):
-        m = re.match(r'^PH4-SM-[\d]+-([\w-]+?)-t:([\w]+?)-r:([\w]+?)-b:([\w]+?)-s:([\w]+?)-e:([\w]+?)-i:([\w.]+)-(.+?)?$', s)
+    def break_exp_ph4(self, s, prefix='PH4-SM'):
+        m = re.match(r'^%s-[\d]+-([\w-]+?)-t:([\w]+?)-r:([\w]+?)-b:([\w]+?)-s:([\w]+?)-e:([\w]+?)-i:([\w.]+)-(.+?)?$' % (prefix,), s)
         if m is None:
             return ExpInfo()
 
@@ -920,6 +922,10 @@ class Loader:
             psize = 1024*1024*10
         elif psize == '100MiB':
             psize = 1024*1024*100
+        elif psize == '400MiB':
+            psize = 1024*1024*400
+        elif psize == '500MiB':
+            psize = 1024*1024*500
         elif psize == '1000MiB':
             psize = 1024*1024*1000
         else:
@@ -1173,6 +1179,10 @@ class Loader:
                 logger.info('Loading ph4-sm experiments ')
                 wheres.append("name LIKE 'PH4-SM-%%'")
 
+            if self.args.is_syso_sm:
+                logger.info('Loading sytso-sm experiments ')
+                wheres.append("name LIKE 'SYSO-SM-%%'")
+
             if self.args.is_ph4_mpc:
                 logger.info('Loading ph4-sm-mpc experiments ')
                 wheres.append("name LIKE 'testmpc%%'")
@@ -1203,6 +1213,7 @@ class Loader:
             is_sm = self.args.is_secmargins
             is_ph4_sm = self.args.is_ph4_sm
             is_ph4_mpc = self.args.is_ph4_mpc
+            is_syso_sm = self.args.is_syso_sm
             is_ph4_ref = self.args.is_ph4_ref
             no_file_sizes = []
 
@@ -1214,16 +1225,16 @@ class Loader:
                 exp_info = None
                 if is_sm:
                     exp_info = self.break_exp(name)
-                if is_ph4_sm and (exp_info is None or exp_info.fnc is None):
-                    exp_info = self.break_exp_ph4(name)
+                if (is_ph4_sm or is_syso_sm) and (exp_info is None or exp_info.fnc is None):
+                    exp_info = self.break_exp_ph4(name, 'PH4-SM' if is_ph4_sm else 'SYSO-SM')
                 if is_ph4_mpc and (exp_info is None or exp_info.fnc is None):
                     exp_info = self.break_exp_ph4_mpc(name)
                 if is_ph4_ref and (exp_info is None or exp_info.fnc is None):
                     exp_info = self.break_exp_ph4_aes_ref(name)
 
-                if (is_sm or is_ph4_sm) and len(wanted_exps) > 0 and exp_info.id not in wanted_exps:
+                if (is_sm or is_ph4_sm or is_syso_sm) and len(wanted_exps) > 0 and exp_info.id not in wanted_exps:
                     continue
-                if (is_sm or is_ph4_sm) and len(wanted_ids) > 0 and eid not in wanted_ids:
+                if (is_sm or is_ph4_sm or is_syso_sm) and len(wanted_ids) > 0 and eid not in wanted_ids:
                     continue
 
                 exp_obj = Experiment(eid, name, exp_info,
@@ -1231,7 +1242,7 @@ class Loader:
                                      config_data_id=config_file_id, source_data_id=data_file_id)
 
                 # Add structured info to the exp file for better processing (larger file though)
-                if (is_ph4_sm or is_ph4_mpc) and exp_info:
+                if (is_ph4_sm or is_ph4_mpc or is_syso_sm) and exp_info:
                     exp_obj.aux_res = collections.OrderedDict([
                         ('tp', exp_info.fnc_type),
                         ('f', exp_info.fnc_name),
@@ -1243,11 +1254,11 @@ class Loader:
 
                 self.experiments[eid] = exp_obj
 
-                if (is_sm or is_ph4_sm) and exp_info.fnc is None:
+                if (is_sm or is_ph4_sm or is_syso_sm) and exp_info.fnc is None:
                     logger.warning('Could not parse exp %s' % (exp_obj,))
                     continue
 
-                if is_ph4_sm and data_file_size is not None and exp_info.size is not None \
+                if (is_ph4_sm or is_syso_sm) and data_file_size is not None and exp_info.size is not None \
                         and abs(data_file_size - exp_info.size) > exp_info.size * 0.1:
                     logger.warning('Data file size does not match exp size for eid %s, %s, %s; data file: %s '
                                    % (eid, exp_obj, exp_info, data_file_size))
