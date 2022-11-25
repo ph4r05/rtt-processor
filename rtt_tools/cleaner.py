@@ -667,8 +667,10 @@ class Cleaner:
             where_clauses.append("j.battery LIKE 'NIST%%'")
         if crush:
             where_clauses.append("j.battery = 'tu01_crush'")
-        for bt in (batteries or []):
-            where_clauses.append(f"j.battery LIKE '{bt}'")
+
+        or_bats = [f"(j.battery LIKE '{bt}')" for bt in (batteries or [])]
+        if or_bats:
+            where_clauses.append(' OR '.join(or_bats))
         return where_clauses
 
     def join_where_clauses(self, where_clauses, prepend_and=False):
@@ -685,7 +687,7 @@ class Cleaner:
         where_clauses = self.where_clauses(from_id or self.exp_id_low, to_id=to_id, prefix=prefix, nist=nist, crush=crush, batteries=batteries)
         where = " AND ".join([f' ({x}) ' for x in where_clauses])
         with self.conn.cursor() as c:
-            logger.info("Processing experiments")
+            logger.info(f"Processing experiments, {where}")
 
             c.execute("""SELECT j.id, j.battery, e.id, e.name, b.id, b.name, b.total_tests
                             FROM jobs j
