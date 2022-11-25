@@ -179,6 +179,17 @@ class Cleaner:
     def main(self, args=None):
         self.load(args)
 
+    def expand_intervals(self, tests):
+        test_set = []
+        for tdat in tests:
+            if "-" in tdat:
+                interval = tdat.split("-")
+                for x in range(int(interval[0]), int(interval[1]) + 1):
+                    test_set.append(x)
+            else:
+                test_set.append(int(tdat))
+        return test_set
+
     def fix_mpcexps(self):
         """Fix testmpc experiment seed run indexing, lhw03 was used.
         In those cases we need to reindex also lower runs"""
@@ -636,6 +647,49 @@ class Cleaner:
                 jid, jbat, eid, ename, bid, bname, btotal = result[0:7]
 
                 logger.info(f'Zero tests for battery, {eid} {ename} : {bname}')
+                if dry_run:
+                    continue
+
+                self._remove_bat(c, bid=bid, jid=jid, eid=eid)
+                self.conn.commit()
+
+        self.conn.commit()
+
+    def rerun_batteries(self, from_id=None, to_id=None, prefix=None, dry_run=False, nist=False, crush=False, all_batteries=False, batteries=None):
+        """Reruns given batteries battery"""
+        if not nist and not crush and not batteries and not all_batteries:
+            raise ValueError('Failsafe: batteries have to be specified, or ALL should be enabled.')
+
+        where_clauses = []
+        if to_id:
+            where_clauses.append(f"e.id <= {to_id}")
+        if prefix:
+            where_clauses.append(f"e.name LIKE '{prefix}%%'")
+        if nist:
+            where_clauses.append("j.battery LIKE 'NIST%%'")
+        if crush:
+            where_clauses.append("j.battery = 'tu01_crush'")
+        for bt in (batteries or []):
+            where_clauses.append(f"j.battery LIKE '{bt}'")
+
+        where = " AND ".join([f' ({x}) ' for x in where_clauses])
+        with self.conn.cursor() as c:
+            logger.info("Processing experiments")
+
+            c.execute("""SELECT j.id, j.battery, e.id, e.name, b.id, b.name, b.total_tests
+                            FROM jobs j
+                            JOIN experiments e on e.id = j.experiment_id
+                            LEFT JOIN batteries b ON b.job_id = j.id
+                            WHERE e.id >= %s 
+                            AND j.status = 'finished' 
+                            AND %s
+                            ORDER BY e.id
+                              """ % (from_id or self.exp_id_low, where, ))
+
+            for result in c.fetchall():
+                jid, jbat, eid, ename, bid, bname, btotal = result[0:7]
+
+                logger.info(f'Resetting battery, {eid} {ename} : {bname}')
                 if dry_run:
                     continue
 
