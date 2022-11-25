@@ -655,12 +655,10 @@ class Cleaner:
 
         self.conn.commit()
 
-    def rerun_batteries(self, from_id=None, to_id=None, prefix=None, dry_run=False, nist=False, crush=False, all_batteries=False, batteries=None):
-        """Reruns given batteries battery"""
-        if not nist and not crush and not batteries and not all_batteries:
-            raise ValueError('Failsafe: batteries have to be specified, or ALL should be enabled.')
-
+    def where_clauses(self, from_id=None, to_id=None, prefix=None, nist=False, crush=False, all_batteries=False, batteries=None):
         where_clauses = []
+        if from_id:
+            where_clauses.append(f"e.id >= {from_id}")
         if to_id:
             where_clauses.append(f"e.id <= {to_id}")
         if prefix:
@@ -671,7 +669,20 @@ class Cleaner:
             where_clauses.append("j.battery = 'tu01_crush'")
         for bt in (batteries or []):
             where_clauses.append(f"j.battery LIKE '{bt}'")
+        return where_clauses
 
+    def join_where_clauses(self, where_clauses, prepend_and=False):
+        where = " AND ".join([f' ({x}) ' for x in where_clauses])
+        if prepend_and and where:
+            where = f' AND {where}'
+        return where
+
+    def rerun_batteries(self, from_id=None, to_id=None, prefix=None, dry_run=False, nist=False, crush=False, all_batteries=False, batteries=None):
+        """Reruns given batteries battery"""
+        if not nist and not crush and not batteries and not all_batteries:
+            raise ValueError('Failsafe: batteries have to be specified, or ALL should be enabled.')
+
+        where_clauses = self.where_clauses(from_id or self.exp_id_low, to_id=to_id, prefix=prefix, nist=nist, crush=crush, batteries=batteries)
         where = " AND ".join([f' ({x}) ' for x in where_clauses])
         with self.conn.cursor() as c:
             logger.info("Processing experiments")
@@ -680,11 +691,10 @@ class Cleaner:
                             FROM jobs j
                             JOIN experiments e on e.id = j.experiment_id
                             LEFT JOIN batteries b ON b.job_id = j.id
-                            WHERE e.id >= %s 
-                            AND j.status = 'finished' 
+                            WHERE j.status = 'finished' 
                             AND %s
                             ORDER BY e.id
-                              """ % (from_id or self.exp_id_low, where, ))
+                              """ % (where, ))
 
             for result in c.fetchall():
                 jid, jbat, eid, ename, bid, bname, btotal = result[0:7]
@@ -1125,7 +1135,7 @@ class Cleaner:
 
             logger.info('Finished')
 
-    def dump_experiment_configs(self, from_id: int, tmpdir='/tmp/rspecs', matcher=None, clean_before=False):
+    def dump_experiment_configs(self, from_id: int, to_id: int | None, prefix: str | None, tmpdir='/tmp/rspecs', matcher=None, clean_before=False):
         """
         Loads all experiment configuration files and dumps them as jsons to the file system.
         Used by analysis scripts to resubmit work.
@@ -1135,13 +1145,16 @@ class Cleaner:
 
         os.makedirs(tmpdir, exist_ok=True)
         expfiles = set()
+
+        where_clauses = self.where_clauses(from_id=from_id, to_id=to_id, prefix=prefix)
+        where = self.join_where_clauses(where_clauses)
         with self.conn.cursor() as c:
             logger.info("Loading experiment input configs: %s" % (from_id,))
             sql_sel = """SELECT e.id, name, dp.`provider_config`, dp.provider_name, dp.id, dp.provider_config_name
                             FROM experiments e
                             JOIN rtt_data_providers dp ON e.data_file_id = dp.id
-                            WHERE e.id >= %s
-                              """ % (from_id,)
+                            WHERE %s
+                              """ % (where,)
             logger.info('SQL: %s' % sql_sel)
             c.execute(sql_sel)
 
@@ -1170,6 +1183,8 @@ class Cleaner:
             js = list(expfiles)
             js.sort(key=natural_sort_key)
             json.dump(js, fh)
+
+        logger.info(f'Data configs returned to {tmpdir}')
 
     def _name_find(self, nname_find):
         nname_find = re.sub(r'^PH4?-SM-([\d]+)-', '', nname_find)
